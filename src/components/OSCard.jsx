@@ -1,102 +1,91 @@
 import React from 'react';
-import { CalendarDays, Sun, Moon, Wrench, MapPin, AlertTriangle, User, History, Trash2, MessageCircle } from 'lucide-react';
-import { calcDuration, getStatusColor, isOvertime } from '../utils';
+import { useDrag } from 'react-dnd';
+import { 
+  MapPin, Clock, PenTool, Trash2, Smartphone, 
+  MessageCircle, Hash, Navigation, Wifi 
+} from 'lucide-react';
 
-export default function OSCard({ os, handleDragStart, handleUpdateDate, handleUpdateField, handleUpdateStatus, handleDelete, verHistorico, listaTecnicos, sendWhatsApp, userRole }) {
+function OSCard({ os, handleEditOS, handleDragStart, handleUpdateDate, handleUpdateField, handleUpdateStatus, handleDelete, verHistorico, listaTecnicos, sendWhatsApp, userRole }) {
   
-  const isAdmin = userRole === 'admin';
+  const [{ isDragging }, drag] = useDrag(() => ({
+    type: 'OS_CARD',
+    item: os,
+    collect: (monitor) => ({
+      isDragging: !!monitor.isDragging(),
+    }),
+  }), [os]);
+
+  // --- NOVAS CORES BASEADAS NOS STATUS DO SGP ---
+  const getStatusColor = (status) => {
+    switch(status) {
+      case 'Encerrada': return 'bg-green-100 border-green-200'; // 1 - Verde
+      case 'Em Execução': return 'bg-blue-50 border-blue-200';   // 2 - Azul
+      case 'Pendente': return 'bg-white border-orange-200';      // 3 - Laranja/Branco
+      case 'Aberta': return 'bg-gray-50 border-gray-200';        // 0 - Cinza
+      default: return 'bg-white border-gray-100';
+    }
+  };
 
   return (
-    <div 
-      draggable={isAdmin} 
-      onDragStart={(e) => isAdmin && handleDragStart(e, os)}
-      className={`p-3 bg-white rounded-lg shadow-sm border border-gray-200 mb-3 hover:shadow-md transition-all border-l-4 hover:border-l-[#EB6410] ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''}`}
-    >
-      <div className="flex flex-wrap items-center gap-2 mb-2">
-        
-        {/* DATA: Só Admin pode alterar */}
-        <div className={`flex items-center bg-gray-50 rounded border px-2 py-0.5 relative ${isAdmin ? 'cursor-pointer hover:bg-gray-100' : ''}`} title="Data">
-            <CalendarDays size={12} className="text-[#EB6410] mr-1"/>
-            <span className="text-[10px] font-bold text-gray-600">{new Date(os.data).toLocaleDateString('pt-BR',{timeZone:'UTC'})}</span>
-            {isAdmin && (
-              <input type="date" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={(e) => handleUpdateDate(os.uid, e.target.value, os.data)} />
-            )}
+    <div ref={drag} onDragStart={(e) => handleDragStart(e, os)} className={`relative p-3 rounded-xl border-2 shadow-sm transition-all duration-200 group ${getStatusColor(os.status)} ${isDragging ? 'opacity-50 scale-95' : 'hover:shadow-md hover:border-orange-300'}`}>
+      
+      {/* HEADER: DATA E STATUS */}
+      <div className="flex justify-between items-start mb-2">
+        <div className="flex items-center gap-1">
+          <input type="date" className="text-[10px] font-bold bg-white border border-gray-300 rounded px-1 py-0.5 text-gray-600 focus:border-[#EB6410] outline-none cursor-pointer hover:bg-gray-50" value={os.data} onChange={(e) => handleUpdateDate(os.uid, e.target.value, os.data)} onClick={(e) => e.stopPropagation()} />
+          <select className="text-[10px] font-bold bg-white border border-gray-300 rounded px-1 py-0.5 text-gray-600 outline-none cursor-pointer" value={os.horario} onChange={(e) => handleUpdateField(os.uid, 'horario', e.target.value, os)}><option value="Manhã">M</option><option value="Tarde">T</option></select>
         </div>
 
-        {/* TURNO */}
-        <div className={`flex items-center bg-gray-50 rounded border px-1 py-0.5 ${!isAdmin ? 'opacity-70' : ''}`} title="Turno">
-          {os.horario === 'Manhã' ? <Sun size={12} className="text-orange-400 mr-1"/> : <Moon size={12} className="text-blue-400 mr-1"/>}
-          <select 
-            disabled={!isAdmin} 
-            value={os.horario} 
-            onChange={(e) => handleUpdateField(os.uid, 'horario', e.target.value, os)} 
-            className="bg-transparent text-[10px] font-bold text-gray-600 outline-none cursor-pointer disabled:cursor-not-allowed appearance-none"
-          >
-            <option value="Manhã">M</option>
-            <option value="Tarde">T</option>
-          </select>
-        </div>
-
-        {/* STATUS: Com opção Cancelado agora */}
+        {/* SELECTOR DE STATUS COM OS NOMES NOVOS */}
         <select 
-          value={os.status} 
-          onChange={(e) => handleUpdateStatus(os.uid, e.target.value)} 
-          className={`text-[10px] px-2 py-0.5 rounded-full border font-bold outline-none cursor-pointer ${getStatusColor(os.status)}`}
+          className={`text-[10px] font-bold border rounded px-2 py-0.5 outline-none cursor-pointer appearance-none text-center min-w-[80px]
+          ${os.status === 'Encerrada' ? 'bg-green-200 text-green-800 border-green-300' : 
+            os.status === 'Em Execução' ? 'bg-blue-200 text-blue-800 border-blue-300' : 
+            os.status === 'Aberta' ? 'bg-gray-200 text-gray-700 border-gray-300' :
+            'bg-[#FCECD8] text-[#9D4D00] border-orange-200'}
+          `}
+          value={os.status}
+          // Nota: Como o robô é espelho, essa mudança aqui é visual, mas o SGP é quem manda na próxima leitura.
+          // Se quiser manter manual, ok. Se for espelho total, esse select vira apenas visualização.
+          onChange={(e) => handleUpdateStatus(os.uid, e.target.value)}
         >
+          <option>Aberta</option>
           <option>Pendente</option>
-          <option>Em Andamento</option>
-          <option>Concluído</option>
-          <option value="Cancelado">Cancelado</option> {/* NOVA OPÇÃO */}
+          <option>Em Execução</option>
+          <option>Encerrada</option>
         </select>
       </div>
-      
-      <h3 className="font-bold text-gray-800 text-sm leading-tight mb-1">{os.cliente}</h3>
-      
-      <div className="flex items-center gap-1 mb-2">
-        <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 flex items-center gap-1"><Wrench size={10} /> {os.tipo}</span>
-        {os.telefone && (
-          <button onClick={() => sendWhatsApp(os.telefone, os.cliente, os.tipo)} className="text-[10px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-200 flex items-center gap-1 hover:bg-green-100 transition" title="Enviar WhatsApp">
-            <MessageCircle size={10} /> Avisar
-          </button>
-        )}
-      </div>
 
-      <p className="text-xs text-gray-500 flex items-center gap-1 mb-2 truncate"><MapPin size={12}/> {os.endereco}</p>
-      
-      <div className="bg-gray-50 p-2 rounded border border-gray-100 flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1"><label className="text-[9px] font-bold text-gray-400">INI</label>
-          <input type="time" className="bg-white border rounded px-1 text-[10px] w-14 focus:border-[#EB6410] outline-none" value={os.hora_inicio || ''} onChange={(e) => handleUpdateField(os.uid, 'hora_inicio', e.target.value, os)} />
-        </div>
-        <div className="flex items-center gap-1"><label className="text-[9px] font-bold text-gray-400">FIM</label>
-          <input type="time" className={`bg-white border rounded px-1 text-[10px] w-14 outline-none ${isOvertime(os.hora_fim) ? 'border-red-500 text-red-600 font-bold' : 'focus:border-[#EB6410]'}`} value={os.hora_fim || ''} onChange={(e) => handleUpdateField(os.uid, 'hora_fim', e.target.value, os)} />
-        </div>
-        {os.hora_inicio && os.hora_fim && (<span className="text-[10px] font-bold text-[#EB6410] ml-auto">{calcDuration(os.hora_inicio, os.hora_fim)}h</span>)}
-      </div>
-
-      {isOvertime(os.hora_fim) && <div className="mt-1 flex items-center gap-1 text-[10px] text-red-500 font-bold bg-red-50 px-2 py-1 rounded"><AlertTriangle size={10} /> Hora Extra (+18:00)</div>}
-
-      <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between">
-        <div className={`flex items-center bg-gray-50 rounded border px-2 py-1 max-w-[120px] ${!isAdmin ? 'opacity-70' : ''}`} title="Atribuir Técnico">
-           <User size={12} className="text-gray-400 mr-1"/>
-           <select 
-             disabled={!isAdmin}
-             value={os.tecnico || ''} 
-             onChange={(e) => handleUpdateField(os.uid, 'tecnico', e.target.value, os)} 
-             className="bg-transparent text-[10px] font-bold text-gray-600 outline-none cursor-pointer w-full truncate disabled:cursor-not-allowed appearance-none" 
-             onClick={(e) => e.stopPropagation()}
-           >
-             <option value="">A definir</option>{listaTecnicos.map(t => <option key={t} value={t}>{t}</option>)}
-           </select>
-        </div>
+      <div onClick={() => handleEditOS(os)} className="cursor-pointer">
+        <h4 className="font-bold text-gray-800 leading-tight mb-1 truncate">{os.cliente}</h4>
         
-        <div className="flex gap-1">
-           <button onClick={() => verHistorico(os.uid)} className="text-gray-400 hover:text-[#EB6410] p-1 rounded hover:bg-orange-50"><History size={14}/></button>
-           
-           {isAdmin && (
-             <button onClick={() => handleDelete(os.uid)} className="text-gray-300 hover:text-red-500 p-1 rounded hover:bg-red-50" title="Excluir"><Trash2 size={14}/></button>
-           )}
+        <div className="flex flex-wrap gap-1 mb-2">
+          <span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded flex items-center gap-1 border border-gray-200"><PenTool size={10} /> {os.tipo}</span>
+          {os.plano && <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded flex items-center gap-1 border border-blue-200 truncate max-w-full"><Wifi size={10} /> {os.plano}</span>}
+        </div>
+
+        <div className="text-[10px] text-gray-500 mb-2 space-y-0.5">
+          <p className="flex items-center gap-1 truncate"><MapPin size={10} className="shrink-0"/> {os.endereco}</p>
+          {os.referencia && <p className="flex items-center gap-1 truncate text-orange-600 font-medium"><Navigation size={10} className="shrink-0"/> Ref: {os.referencia}</p>}
+        </div>
+
+        <div className="flex gap-2 items-center bg-gray-50 p-1.5 rounded-lg border border-gray-200" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1 flex-1"><span className="text-[9px] font-bold text-gray-400">INI</span><input type="time" className="w-full bg-white border border-gray-300 rounded px-1 py-0.5 text-[10px] font-bold text-gray-700 text-center focus:border-[#EB6410]" value={os.hora_inicio} onChange={(e) => handleUpdateField(os.uid, 'hora_inicio', e.target.value, os)}/></div>
+          <div className="flex items-center gap-1 flex-1"><span className="text-[9px] font-bold text-gray-400">FIM</span><input type="time" className="w-full bg-gray-100 border border-transparent rounded px-1 py-0.5 text-[10px] font-bold text-gray-500 text-center" value={os.hora_fim} disabled /></div>
         </div>
       </div>
+
+      <div className="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center">
+        <select className={`text-[10px] font-bold bg-white border border-gray-200 rounded px-1 py-1 max-w-[100px] truncate outline-none focus:border-[#EB6410] ${!os.tecnico || os.tecnico === 'A Definir' ? 'text-red-500' : 'text-gray-700'}`} value={os.tecnico || ""} onChange={(e) => handleUpdateField(os.uid, 'tecnico', e.target.value, os)}><option value="">A definir</option>{(listaTecnicos || []).map(t => <option key={t} value={t}>{t}</option>)}</select>
+        <div className="flex items-center gap-1">
+           <button onClick={() => sendWhatsApp(os.telefone, os.cliente, os.tipo)} className="text-green-500 hover:bg-green-50 p-1 rounded transition" title="WhatsApp"><MessageCircle size={14} /></button>
+          <button onClick={() => verHistorico(os.uid)} className="text-gray-400 hover:text-[#EB6410] hover:bg-orange-50 p-1 rounded transition" title="Histórico"><Clock size={14} /></button>
+          {userRole === 'admin' && <button onClick={() => handleDelete(os.uid)} className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1 rounded transition" title="Excluir"><Trash2 size={14} /></button>}
+        </div>
+      </div>
+      
+      {os.protocolo && <div className="absolute top-1 right-1 text-[8px] text-gray-300 flex items-center gap-0.5"><Hash size={8} /> {os.protocolo}</div>}
     </div>
   );
 }
+export default OSCard;
