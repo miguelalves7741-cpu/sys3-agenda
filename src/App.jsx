@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Calendar as CalIcon, ClipboardList, User, Clock, X, Filter, LogOut, CheckCircle, ChevronLeft, ChevronRight, 
-  Timer, History, CalendarDays, GripHorizontal, Settings, Plus, Briefcase, Activity, Search, Shield, Lock, Trash2, MessageCircle, AlertTriangle, Sun, Moon, MapPin, Wrench
+  Timer, History, CalendarDays, GripHorizontal, Settings, Plus, Briefcase, Activity, Search, Shield, Lock, Trash2, MessageCircle, AlertTriangle, Sun, Moon, MapPin, Wrench, BarChart3
 } from 'lucide-react';
 import logoSys3 from './assets/imgLOGO.png';
 import { db, auth } from './firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, getDocs, setDoc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
-// Componentes
+// --- IMPORTAÇÃO DOS COMPONENTES (Verifique se os arquivos existem na pasta components) ---
 import Login from './components/Login';
 import OSCard from './components/OSCard';
+import Dashboard from './components/Dashboard'; // Certifique-se que src/components/Dashboard.jsx existe
 import { calcDuration, timeToMinutes, formatDataBr, addTimes } from './utils';
 
 function App() {
@@ -219,6 +220,7 @@ function App() {
   const handleDragOverTech = (e, techName) => { e.preventDefault(); setDragOverTech(techName); };
   const handleDropTech = async (e, targetTech) => { e.preventDefault(); setDragOverTech(null); if (draggedOS) { if (!checkCapacity(targetTech, draggedOS.data, draggedOS.horario, draggedOS.tipo, draggedOS.uid)) return; await handleUpdateField(draggedOS.uid, 'tecnico', targetTech); setDraggedOS(null); } };
 
+  // --- CONFIG ACTIONS ---
   const handleUpdateLimites = async (campo, valor) => { if (userRole !== 'admin') return; const novos = { ...limites, [campo]: Number(valor) }; setLimites(novos); await updateDoc(doc(db, "configuracoes", "geral"), { limites: novos }); };
   const handleAddTecnico = async (e) => { e.preventDefault(); if (userRole !== 'admin') return; if(!novoTecnico.trim()) return; await updateDoc(doc(db, "configuracoes", "geral"), { tecnicos: [...listaTecnicos, novoTecnico.trim()] }); setNovoTecnico(""); };
   const handleRemoveTecnico = async (nome) => { if (userRole !== 'admin') return; if(confirm("Remover?")) await updateDoc(doc(db, "configuracoes", "geral"), { tecnicos: listaTecnicos.filter(t => t !== nome) }); };
@@ -241,11 +243,12 @@ function App() {
     <div className="min-h-screen p-4 md:p-8 font-sans bg-[#f3f4f6] text-[#000000] flex flex-col">
       <header className="mb-6 flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border-t-4 border-[#EB6410]">
         <div className="flex items-center gap-4 mb-4 md:mb-0"><img src={logoSys3} className="h-10 object-contain" /><div className="hidden md:block h-6 w-px bg-gray-200"></div><span className="text-sm font-bold text-gray-600 hidden md:block">Gestão Inteligente</span></div>
-        <div className="flex bg-gray-100 p-1 rounded-lg">
-          <button onClick={() => setCurrentTab('hoje')} className={`px-4 py-2 rounded-md text-sm font-bold transition ${currentTab === 'hoje' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Hoje</button>
-          <button onClick={() => setCurrentTab('calendario')} className={`px-4 py-2 rounded-md text-sm font-bold transition ${currentTab === 'calendario' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Calendário</button>
-          <button onClick={() => setCurrentTab('tecnicos')} className={`px-4 py-2 rounded-md text-sm font-bold transition ${currentTab === 'tecnicos' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Performance</button>
-          <button onClick={() => setCurrentTab('config')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 ${currentTab === 'config' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><Settings size={14}/> Config</button>
+        <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto">
+          <button onClick={() => setCurrentTab('hoje')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${currentTab === 'hoje' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Hoje</button>
+          <button onClick={() => setCurrentTab('calendario')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${currentTab === 'calendario' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Calendário</button>
+          <button onClick={() => setCurrentTab('tecnicos')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${currentTab === 'tecnicos' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Performance</button>
+          <button onClick={() => setCurrentTab('dashboard')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 whitespace-nowrap ${currentTab === 'dashboard' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><BarChart3 size={14}/> Comercial</button>
+          <button onClick={() => setCurrentTab('config')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 whitespace-nowrap ${currentTab === 'config' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><Settings size={14}/> Config</button>
         </div>
         <div className="flex gap-2 mt-4 md:mt-0">
           <button onClick={() => setIsModalOpen(true)} className="bg-[#EB6410] text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:opacity-90"><ClipboardList size={18} /> Nova OS</button>
@@ -261,7 +264,7 @@ function App() {
            <div className="flex flex-col md:flex-row justify-between items-center mb-4 px-1 gap-4">
              <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-lg shadow-sm"><Clock className="text-[#EB6410]" size={20}/><span className="font-bold text-gray-700">Dia: {new Date().toLocaleDateString('pt-BR')}</span></div>
              <div className="flex-1 max-w-md relative"><input type="text" placeholder="Buscar..." className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:border-[#EB6410] outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /><Search className="absolute left-3 top-2.5 text-gray-400" size={18} /></div>
-             <div className="flex gap-2 bg-white p-1 rounded-lg shadow-sm">{['Todos', 'Pendente', 'Em Andamento', 'Concluído'].map(st => <button key={st} onClick={() => setFilter(st)} className={`px-3 py-1 rounded text-xs font-bold transition ${filter === st ? 'bg-[#DFDAC6] text-[#EB6410]' : 'text-gray-500 hover:bg-gray-50'}`}>{st}</button>)}</div>
+             <div className="flex gap-2 bg-white p-1 rounded-lg shadow-sm">{['Todos', 'Pendente', 'Em Andamento', 'Concluído', 'Cancelado'].map(st => <button key={st} onClick={() => setFilter(st)} className={`px-3 py-1 rounded text-xs font-bold transition ${filter === st ? 'bg-[#DFDAC6] text-[#EB6410]' : 'text-gray-500 hover:bg-gray-50'}`}>{st}</button>)}</div>
            </div>
            <div className="flex gap-4 min-w-full items-start">
               <div onDragOver={(e) => handleDragOverTech(e, '')} onDrop={(e) => handleDropTech(e, '')} className={`min-w-[300px] w-[300px] bg-gray-100 rounded-xl p-3 border-2 transition-colors ${dragOverTech === '' ? 'border-[#EB6410] bg-orange-50' : 'border-transparent'}`}>
@@ -284,6 +287,9 @@ function App() {
       {/* PERFORMANCE */}
       {currentTab === 'tecnicos' && (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{getTechStats().map(([nome, dados]) => { const avgMinutes = dados.tmaCount > 0 ? Math.floor(dados.tmaMin / dados.tmaCount) : 0; return (<div key={nome} className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-[#EB6410] hover:shadow-md transition"><div className="flex justify-between items-start mb-4"><div className="bg-gray-100 p-3 rounded-full"><User className="text-[#EB6410]" size={24}/></div><div className="text-right"><p className="text-xs text-gray-500 font-bold uppercase">Total OS</p><p className="text-2xl font-bold text-[#EB6410]">{dados.total}</p></div></div><h3 className="text-lg font-bold mb-4">{nome}</h3><div className="space-y-3"><div className="flex justify-between items-center text-sm"><span className="flex items-center gap-2 text-gray-600"><CheckCircle size={16} className="text-green-500"/> Finalizadas</span><span className="font-bold">{dados.concluidas}</span></div><div className="bg-orange-50 p-3 rounded-lg border border-orange-100 mt-2"><p className="text-xs font-bold text-[#EB6410] uppercase mb-1">Tempo Médio (TMA)</p><p className="text-xl font-extrabold text-gray-800 flex items-center gap-2"><Timer size={20} className="text-gray-400"/> {Math.floor(avgMinutes/60)}h {avgMinutes%60}m</p></div></div></div>) })}</div>)}
       
+      {/* NOVO DASHBOARD */}
+      {currentTab === 'dashboard' && <Dashboard />}
+
       {/* CONFIG */}
       {currentTab === 'config' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -327,7 +333,7 @@ function App() {
                        )}
                      </div>
                    ))}
-                   {usuariosSistema.length === 0 && <p className="text-gray-400 text-sm">Carregando usuários...</p>}
+                   {(!usuariosSistema || usuariosSistema.length === 0) && <p className="text-gray-400 text-sm">Carregando usuários...</p>}
                  </div>
                </div>
              )}

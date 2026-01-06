@@ -8,35 +8,45 @@ export default function OSCard({ os, handleDragStart, handleUpdateDate, handleUp
 
   return (
     <div 
-      draggable // Todos podem arrastar agora
-      onDragStart={(e) => handleDragStart(e, os)}
-      className="p-3 bg-white rounded-lg shadow-sm border border-gray-200 mb-3 hover:shadow-md transition-all border-l-4 hover:border-l-[#EB6410] cursor-grab active:cursor-grabbing"
+      draggable={isAdmin} 
+      onDragStart={(e) => isAdmin && handleDragStart(e, os)}
+      className={`p-3 bg-white rounded-lg shadow-sm border border-gray-200 mb-3 hover:shadow-md transition-all border-l-4 hover:border-l-[#EB6410] ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
       <div className="flex flex-wrap items-center gap-2 mb-2">
         
-        {/* DATA: Liberado para todos */}
-        <div className="flex items-center bg-gray-50 rounded border px-2 py-0.5 relative cursor-pointer hover:bg-gray-100" title="Reagendar Data">
+        {/* DATA: Só Admin pode alterar */}
+        <div className={`flex items-center bg-gray-50 rounded border px-2 py-0.5 relative ${isAdmin ? 'cursor-pointer hover:bg-gray-100' : ''}`} title="Data">
             <CalendarDays size={12} className="text-[#EB6410] mr-1"/>
             <span className="text-[10px] font-bold text-gray-600">{new Date(os.data).toLocaleDateString('pt-BR',{timeZone:'UTC'})}</span>
-            <input type="date" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={(e) => handleUpdateDate(os.uid, e.target.value, os.data)} />
+            {isAdmin && (
+              <input type="date" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={(e) => handleUpdateDate(os.uid, e.target.value, os.data)} />
+            )}
         </div>
 
-        {/* TURNO: Liberado para todos */}
-        <div className="flex items-center bg-gray-50 rounded border px-1 py-0.5" title="Alterar Turno">
+        {/* TURNO */}
+        <div className={`flex items-center bg-gray-50 rounded border px-1 py-0.5 ${!isAdmin ? 'opacity-70' : ''}`} title="Turno">
           {os.horario === 'Manhã' ? <Sun size={12} className="text-orange-400 mr-1"/> : <Moon size={12} className="text-blue-400 mr-1"/>}
           <select 
+            disabled={!isAdmin} 
             value={os.horario} 
             onChange={(e) => handleUpdateField(os.uid, 'horario', e.target.value, os)} 
-            className="bg-transparent text-[10px] font-bold text-gray-600 outline-none cursor-pointer appearance-none"
+            className="bg-transparent text-[10px] font-bold text-gray-600 outline-none cursor-pointer disabled:cursor-not-allowed appearance-none"
           >
             <option value="Manhã">M</option>
             <option value="Tarde">T</option>
           </select>
         </div>
 
-        {/* STATUS: Liberado para todos */}
-        <select value={os.status} onChange={(e) => handleUpdateStatus(os.uid, e.target.value)} className={`text-[10px] px-2 py-0.5 rounded-full border font-bold outline-none cursor-pointer ${getStatusColor(os.status)}`}>
-          <option>Pendente</option><option>Em Andamento</option><option>Concluído</option>
+        {/* STATUS: Com opção Cancelado agora */}
+        <select 
+          value={os.status} 
+          onChange={(e) => handleUpdateStatus(os.uid, e.target.value)} 
+          className={`text-[10px] px-2 py-0.5 rounded-full border font-bold outline-none cursor-pointer ${getStatusColor(os.status)}`}
+        >
+          <option>Pendente</option>
+          <option>Em Andamento</option>
+          <option>Concluído</option>
+          <option value="Cancelado">Cancelado</option> {/* NOVA OPÇÃO */}
         </select>
       </div>
       
@@ -66,13 +76,13 @@ export default function OSCard({ os, handleDragStart, handleUpdateDate, handleUp
       {isOvertime(os.hora_fim) && <div className="mt-1 flex items-center gap-1 text-[10px] text-red-500 font-bold bg-red-50 px-2 py-1 rounded"><AlertTriangle size={10} /> Hora Extra (+18:00)</div>}
 
       <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between">
-        {/* TÉCNICO: Liberado para todos */}
-        <div className="flex items-center bg-gray-50 rounded border px-2 py-1 max-w-[120px]" title="Atribuir Técnico">
+        <div className={`flex items-center bg-gray-50 rounded border px-2 py-1 max-w-[120px] ${!isAdmin ? 'opacity-70' : ''}`} title="Atribuir Técnico">
            <User size={12} className="text-gray-400 mr-1"/>
            <select 
+             disabled={!isAdmin}
              value={os.tecnico || ''} 
              onChange={(e) => handleUpdateField(os.uid, 'tecnico', e.target.value, os)} 
-             className="bg-transparent text-[10px] font-bold text-gray-600 outline-none cursor-pointer w-full truncate appearance-none hover:text-[#EB6410]"
+             className="bg-transparent text-[10px] font-bold text-gray-600 outline-none cursor-pointer w-full truncate disabled:cursor-not-allowed appearance-none" 
              onClick={(e) => e.stopPropagation()}
            >
              <option value="">A definir</option>{listaTecnicos.map(t => <option key={t} value={t}>{t}</option>)}
@@ -82,7 +92,6 @@ export default function OSCard({ os, handleDragStart, handleUpdateDate, handleUp
         <div className="flex gap-1">
            <button onClick={() => verHistorico(os.uid)} className="text-gray-400 hover:text-[#EB6410] p-1 rounded hover:bg-orange-50"><History size={14}/></button>
            
-           {/* EXCLUIR: SOMENTE ADMIN */}
            {isAdmin && (
              <button onClick={() => handleDelete(os.uid)} className="text-gray-300 hover:text-red-500 p-1 rounded hover:bg-red-50" title="Excluir"><Trash2 size={14}/></button>
            )}
