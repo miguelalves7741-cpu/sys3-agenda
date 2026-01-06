@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Lock } from 'lucide-react';
-import logoSys3 from '../assets/imgLOGO.png'; // Note o .. para voltar uma pasta
+import { Lock, Sparkles } from 'lucide-react';
+import logoSys3 from '../assets/imgLOGO.png'; 
+import { UpdateBanner, UpdatesDrawer } from './SystemUpdates'; // <--- IMPORT DA SIDEBAR TAMBÉM
 
+// --- CÓDIGO DO ROBÔ ---
 const AdvancedRobot = ({ isPasswordFocused }) => {
   const [eyePos, setEyePos] = useState({ x: 0, y: 0 });
   const [isBlinking, setIsBlinking] = useState(false);
@@ -67,10 +69,14 @@ const AdvancedRobot = ({ isPasswordFocused }) => {
   );
 };
 
+// --- COMPONENTE LOGIN (COM SIDEBAR CONECTADA) ---
 export default function Login({ onLogin, error }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isPwdFocused, setIsPwdFocused] = useState(false);
+  
+  // ESTADO PARA ABRIR A SIDEBAR
+  const [showUpdates, setShowUpdates] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -80,27 +86,52 @@ export default function Login({ onLogin, error }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 p-4">
       <div className="absolute inset-0 z-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#EB6410 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
-      <div className="bg-white/80 backdrop-blur-lg p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-white relative z-10">
-        <div className="flex justify-center mb-4"><img src={logoSys3} className="h-14 object-contain" alt="Logo" /></div>
+      
+      {/* RENDERIZA A SIDEBAR AQUI */}
+      <UpdatesDrawer isOpen={showUpdates} onClose={() => setShowUpdates(false)} />
+
+      <div className="bg-white/90 backdrop-blur-lg rounded-3xl shadow-2xl w-full max-w-4xl border border-white relative z-10 flex flex-col md:flex-row overflow-hidden">
         
-        <AdvancedRobot isPasswordFocused={isPwdFocused} />
-        
-        <h2 className="text-2xl font-bold text-center text-gray-800 mb-1">Bem-vindo</h2>
-        <p className="text-center text-gray-500 mb-6 text-sm font-medium">Faça login para gerenciar a rede.</p>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">E-mail</label>
-            <input type="email" required className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:border-[#EB6410] focus:ring-2 focus:ring-orange-100 outline-none transition font-medium text-gray-700" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="usuario@sys3.com.br" onFocus={() => setIsPwdFocused(false)}/>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Senha</label>
-            <input type="password" required className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:border-[#EB6410] focus:ring-2 focus:ring-orange-100 outline-none transition font-medium text-gray-700" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••" onFocus={() => setIsPwdFocused(true)} onBlur={() => setIsPwdFocused(false)}/>
-          </div>
-          {error && <p className="text-red-500 text-sm font-bold text-center bg-red-50 p-3 rounded-xl border border-red-100">{error}</p>}
-          <button type="submit" className="w-full bg-gradient-to-r from-[#EB6410] to-[#c04d05] hover:opacity-90 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-orange-200 transition transform hover:scale-[1.02]"><Lock size={18} /> Acessar Painel</button>
-        </form>
-        <p className="text-center text-[10px] text-gray-400 mt-6 font-medium">SYS3 INTERNET © 2026</p>
+        {/* ÁREA LATERAL ESQUERDA (NOVIDADES) */}
+        <div className="hidden md:flex md:w-5/12 bg-orange-50/50 border-r border-orange-100 p-8 flex-col justify-center items-center text-center">
+           <div className="mb-6">
+             <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3 text-[#EB6410]">
+                <Sparkles size={24} />
+             </div>
+             <h3 className="text-[#EB6410] font-bold text-lg">O que há de novo?</h3>
+             <p className="text-xs text-gray-500 mt-1">Acompanhe as melhorias da versão 2.1</p>
+           </div>
+           
+           {/* O BANNER AGORA É CLICÁVEL */}
+           <div className="w-full transform transition hover:scale-105 duration-300 cursor-pointer" onClick={() => setShowUpdates(true)}>
+             <UpdateBanner />
+           </div>
+
+           <p className="text-[10px] text-gray-400 mt-8 leading-relaxed max-w-[200px]">
+             Clique no card acima para ler os detalhes completos.
+           </p>
+        </div>
+
+        {/* ÁREA DIREITA (LOGIN + ROBÔ) */}
+        <div className="w-full md:w-7/12 p-8 md:p-12 flex flex-col justify-center">
+          <div className="flex justify-center mb-4"><img src={logoSys3} className="h-14 object-contain" alt="Logo" /></div>
+          <AdvancedRobot isPasswordFocused={isPwdFocused} />
+          <h2 className="text-2xl font-bold text-center text-gray-800 mb-1">Bem-vindo</h2>
+          <p className="text-center text-gray-500 mb-6 text-sm font-medium">Faça login para gerenciar a rede.</p>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">E-mail</label>
+              <input type="email" required className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:border-[#EB6410] focus:ring-2 focus:ring-orange-100 outline-none transition font-medium text-gray-700" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="usuario@sys3.com.br" onFocus={() => setIsPwdFocused(false)}/>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Senha</label>
+              <input type="password" required className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:border-[#EB6410] focus:ring-2 focus:ring-orange-100 outline-none transition font-medium text-gray-700" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••" onFocus={() => setIsPwdFocused(true)} onBlur={() => setIsPwdFocused(false)}/>
+            </div>
+            {error && <p className="text-red-500 text-sm font-bold text-center bg-red-50 p-3 rounded-xl border border-red-100">{error}</p>}
+            <button type="submit" className="w-full bg-gradient-to-r from-[#EB6410] to-[#c04d05] hover:opacity-90 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-orange-200 transition transform hover:scale-[1.02]"><Lock size={18} /> Acessar Painel</button>
+          </form>
+          <p className="text-center text-[10px] text-gray-400 mt-6 font-medium">SYS3 INTERNET © 2026</p>
+        </div>
       </div>
     </div>
   );
