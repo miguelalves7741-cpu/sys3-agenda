@@ -1,118 +1,90 @@
 import React from 'react';
-import { X, Sparkles, Rocket, Calendar, CheckCircle2 } from 'lucide-react';
+import { X, Zap } from 'lucide-react';
 
-// --- LISTA DE ATUALIZAÇÕES (Adicione novas aqui no topo) ---
-const updatesData = [
-  {
-    version: '2.1',
-    date: '06/01/2026',
-    title: 'Gestão de Escalas e Folgas',
-    description: 'Agora é possível cadastrar folgas totais ou parciais para os técnicos. O sistema avisa visualmente no Kanban e no Calendário quando um técnico está indisponível.',
-    type: 'major' // major = destaque
-  },
-  {
-    version: '2.0',
-    date: '05/01/2026',
-    title: 'Painel Comercial & Notificações',
-    description: 'Nova aba com indicadores manuais de vendas/cancelamentos e sistema de notificações em tempo real para alterações de OS.',
-    type: 'feature'
-  },
-  {
-    version: '1.5',
-    date: '02/01/2026',
-    title: 'Controle de Acesso',
-    description: 'Separação total entre perfil Admin (Configurações) e Interno (Operacional).',
-    type: 'fix'
-  }
-];
-
-// --- COMPONENTE 1: BANNER DO LOGIN (Animado) ---
-export function UpdateBanner() {
-  const latest = updatesData[0]; // Pega a última atualização
-
-  return (
-    <div className="mb-6 relative group cursor-default">
-      <div className="absolute -inset-1 bg-gradient-to-r from-orange-600 to-indigo-600 rounded-lg blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
-      <div className="relative px-4 py-3 bg-white ring-1 ring-gray-900/5 rounded-lg leading-none flex items-top justify-start space-x-4 shadow-sm border-l-4 border-[#EB6410]">
-        <div className="space-y-1">
-          <p className="text-slate-800 font-bold text-sm flex items-center gap-2">
-            <Sparkles size={16} className="text-[#EB6410]" /> 
-            Novidade: {latest.title}
-            <span className="bg-indigo-100 text-indigo-700 text-[9px] px-2 py-0.5 rounded-full uppercase font-extrabold tracking-wider">v{latest.version}</span>
-          </p>
-          <p className="text-slate-500 text-xs line-clamp-2">
-            {latest.description}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// --- COMPONENTE 2: SIDEBAR DE HISTÓRICO (Pop-up Lateral) ---
-export function UpdatesDrawer({ isOpen, onClose }) {
-  if (!isOpen) return null;
+// Mantemos o nome UpdatesDrawer que o App.jsx usa
+export const UpdatesDrawer = ({ isOpen, onClose }) => {
+  
+  const updates = [
+    {
+      version: "3.5.0",
+      date: "08/01/2026",
+      title: "O Salto de Gestão 360°",
+      type: "major",
+      desc: "Implementação completa dos módulos de Inteligência Comercial e Auditoria Operacional.",
+      changes: [
+        "Agenda Inteligente: Adicionada 'Regra do Dia' para definir vagas manualmente.",
+        "Comercial Automático: Gráficos de Vendas e Churn agora são lidos em tempo real.",
+        "Auditoria de Performance: Clique no nome do técnico para ver a lista detalhada.",
+        "Robô V33: Leitura exata da 'Data de Finalização' do SGP.",
+        "Filtros Visuais: 'Retiradas' e 'Cancelamentos' contam no financeiro mas não ocupam a agenda."
+      ]
+    },
+    {
+      version: "3.2.1",
+      date: "08/01/2026",
+      title: "Refinamentos Visuais",
+      type: "minor",
+      desc: "Melhorias na identificação visual de turnos e organização dos cards.",
+      changes: [
+        "Novos selos de Turno: Ícones de Sol (Manhã) e Lua (Tarde).",
+        "Correção na exibição de OSs misturadas no modal do dia.",
+        "Sincronização em tempo real das Metas de Vagas."
+      ]
+    }
+  ];
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      {/* Overlay Escuro (Clica para fechar) */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
+    <>
+      <div 
+        className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-50 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={onClose}
+      />
 
-      {/* Conteúdo Lateral */}
-      <div className="relative w-full max-w-md bg-white h-full shadow-2xl animate-slide-in-right flex flex-col border-l border-gray-200">
+      <div className={`fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         
-        {/* Header */}
         <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-          <div className="flex items-center gap-3">
-            <div className="bg-orange-100 p-2 rounded-full text-[#EB6410]">
-              <Rocket size={20} />
-            </div>
-            <div>
-              <h2 className="font-bold text-lg text-gray-800">Notas de Atualização</h2>
-              <p className="text-xs text-gray-500">Histórico de evoluções do sistema</p>
-            </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <Zap className="text-[#EB6410]" size={20} /> Atualizações
+            </h2>
+            <p className="text-xs text-gray-500">Histórico de evoluções</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition">
             <X size={20} className="text-gray-500" />
           </button>
         </div>
 
-        {/* Lista de Updates (Timeline) */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-8">
-          {updatesData.map((up, idx) => (
-            <div key={idx} className="relative pl-8 border-l-2 border-gray-200 last:border-0">
-              {/* Bolinha da Timeline */}
-              <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-white shadow-sm ${idx === 0 ? 'bg-[#EB6410]' : 'bg-gray-300'}`}></div>
+        <div className="p-5 h-[calc(100vh-80px)] overflow-y-auto custom-scrollbar space-y-8">
+          {updates.map((update, index) => (
+            <div key={index} className="relative pl-6 border-l-2 border-gray-200 last:border-0">
+              <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-white shadow-sm ${index === 0 ? 'bg-[#EB6410] ring-4 ring-orange-100' : 'bg-gray-300'}`}></div>
               
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${idx === 0 ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>
-                    v{up.version}
-                  </span>
-                  <span className="text-xs text-gray-400 flex items-center gap-1">
-                    <Calendar size={10} /> {up.date}
-                  </span>
-                </div>
-                
-                <h3 className="font-bold text-gray-800 text-sm">{up.title}</h3>
-                <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 p-3 rounded-lg border border-gray-100 mt-1">
-                  {up.description}
-                </p>
+              <div className="mb-1 flex items-center gap-2">
+                <span className={`text-xs font-bold px-2 py-0.5 rounded ${index === 0 ? 'bg-orange-100 text-[#EB6410]' : 'bg-gray-100 text-gray-500'}`}>
+                  v{update.version}
+                </span>
+                <span className="text-xs text-gray-400 font-medium">{update.date}</span>
+              </div>
+
+              <h3 className="text-lg font-bold text-gray-800 mb-1">{update.title}</h3>
+              <p className="text-sm text-gray-600 mb-4 leading-relaxed">{update.desc}</p>
+
+              <div className="space-y-2">
+                {update.changes.map((text, i) => (
+                  <div key={i} className="flex items-start gap-3 bg-gray-50 p-2 rounded border border-gray-100">
+                    <div className="mt-1 w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0"></div>
+                    <p className="text-xs text-gray-600 font-medium leading-snug">{text}</p>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
-          
-          <div className="text-center pt-8 opacity-50">
-            <CheckCircle2 size={32} className="mx-auto text-gray-300 mb-2"/>
-            <p className="text-xs text-gray-400">Você está na versão mais recente.</p>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-100 bg-gray-50 text-center">
-          <p className="text-[10px] text-gray-400">Sys3 Internet © 2026 - Desenvolvido por Miguel</p>
         </div>
       </div>
-    </div>
+    </>
   );
-}
+};
+
+// --- AQUI ESTÁ A MÁGICA ---
+// Exportamos TAMBÉM com o nome antigo 'UpdateBanner' para o Login.jsx não quebrar
+export const UpdateBanner = UpdatesDrawer;

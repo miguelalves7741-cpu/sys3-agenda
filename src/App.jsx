@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-// 1. IMPORTS DO DRAG AND DROP (ADICIONADOS)
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-
 import { 
-  Calendar as CalIcon, ClipboardList, User, Clock, X, Filter, LogOut, CheckCircle, ChevronLeft, ChevronRight, 
-  Timer, History, CalendarDays, GripHorizontal, Settings, Plus, Briefcase, Activity, Search, Shield, Lock, Trash2, MessageCircle, AlertTriangle, Sun, Moon, MapPin, Wrench, BarChart3, Coffee, CalendarOff, Bell, Edit, RefreshCw
+  Calendar as CalIcon, ClipboardList, User, Clock, X, Search, LogOut, CheckCircle, 
+  ChevronLeft, ChevronRight, Timer, History, CalendarDays, GripHorizontal, Settings, 
+  Plus, Briefcase, Activity, Shield, Lock, Trash2, MessageCircle, AlertTriangle, 
+  Coffee, CalendarOff, Bell, BarChart3, Volume2, VolumeX, PlayCircle, Sun, Moon, Zap, UserCheck, ScrollText
 } from 'lucide-react';
 import logoSys3 from './assets/imgLOGO.png';
 import { db, auth } from './firebase';
@@ -16,15 +16,13 @@ import Login from './components/Login';
 import OSCard from './components/OSCard';
 import Dashboard from './components/Dashboard';
 import NotificationToast from './components/NotificationToast';
+import PerformanceTecnica from './components/PerformanceTecnica';
 import { UpdatesDrawer } from './components/SystemUpdates'; 
 import { calcDuration, timeToMinutes, formatDataBr, addTimes } from './utils';
-import { 
-  // ... outros ícones ...
-  Volume2, VolumeX // <--- ADICIONE ESTES DOIS
-} from 'lucide-react';
+import CalendarioVagas from './components/CalendarioVagas';
+import ActivityFeed from './components/ActivityFeed'; 
 
 function App() {
-  // --- AUTH & STATES ---
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState("interno"); 
   const [loadingAuth, setLoadingAuth] = useState(true);
@@ -37,48 +35,20 @@ function App() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(null); 
   const [showUpdates, setShowUpdates] = useState(false); 
-  // ... outros states ...
   const [notification, setNotification] = useState(null);
   const isFirstLoad = useRef(true);
 
-  // --- NOVO: CONTROLE DE SOM ---
-  // Inicia lendo do navegador (se já salvou antes), padrão = Ligado (true)
-  const [soundEnabled, setSoundEnabled] = useState(() => {
-    return localStorage.getItem('sys3_sound_enabled') !== 'false';
-  });
-
-  const playSound = () => {
-    if (!soundEnabled) return;
-    
-    // Som "Ping" suave embutido (Base64) - Funciona Offline e em Localhost
-    const audioUrl = "data:audio/mp3;base64,SUQzBAAAAAABAFRYWFQAAAASAAADbWFqb3JfYnJhbmQAbXA0MgBUWFhUAAAAEQAAA21pbm9yX3ZlcnNpb24AMABUWFhUAAAAHAAAA2NvbXBhdGlibGVfYnJhbmRzAGlzb21tcDQyAFRTU0UAAAAOAAADTGF2ZjU3LjU2LjEwMAAAAAAAAAAAAAAA//uQZAAAAAAAABAAAAAAAAAAAAmkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/7kmRAAAAAAAIAAAAAAAACSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/+5JkAAAAAAACAAAAAAAAAkgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//uSZAAAAAAAIAAAAAAAACSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/7kmAAAAAAAACAAAAAAAAAkgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//uQZAAABxqW0QUAAIAAAAKAAACSzqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//uSZAsABh5gWQUYAIAAAAKAAACSqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq/+5JkEwAGJ2BaBRgAgAAAAoAAJJqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//uSZE4ABiNgWQUYAIAAAAKAAACSqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq/+5JkUwAGHGBZBRgAgAAAAoAAJJqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//uSZFQABiZgWQUYAIAAAAKAAACSqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq/+5JkWAAGH2BZBRgAgAAAAoAAJJqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//uSZFwABiBgWQUYAIAAAAKAAACSqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
-    
-    const audio = new Audio(audioUrl);
-    audio.volume = 0.6;
-    
-    const playPromise = audio.play();
-    if (playPromise !== undefined) {
-      playPromise.catch(error => {
-        console.warn("🔊 Áudio bloqueado pelo navegador. Clique na tela para liberar.");
-      });
-    }
-  };
-
-  // Função para ligar/desligar e salvar a preferência
-  const toggleSound = () => {
-    const newState = !soundEnabled;
-    setSoundEnabled(newState);
-    localStorage.setItem('sys3_sound_enabled', newState);
-  };
-
-  // --- CONFIGURAÇÕES ---
+  // Audio e Configs
+  const [audioContext, setAudioContext] = useState(null);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('sys3_sound_enabled') !== 'false');
   const [listaTecnicos, setListaTecnicos] = useState([]);
   const [listaTipos, setListaTipos] = useState([]); 
   const [limites, setLimites] = useState({ instalacao: 2, chamado: 2 });
   const [folgas, setFolgas] = useState([]); 
   const [usuariosSistema, setUsuariosSistema] = useState([]); 
 
-  // Inputs Config
+  // Forms
   const [novoTecnico, setNovoTecnico] = useState("");
   const [novoTipoNome, setNovoTipoNome] = useState("");
   const [novoTipoDuracao, setNovoTipoDuracao] = useState("01:00");
@@ -86,27 +56,35 @@ function App() {
   const [folgaTecnico, setFolgaTecnico] = useState("");
   const [folgaData, setFolgaData] = useState("");
   const [folgaLimite, setFolgaLimite] = useState(0); 
-
-  // --- DRAG AND DROP STATES ---
   const [draggedOS, setDraggedOS] = useState(null);
-  const [dragOverDate, setDragOverDate] = useState(null); 
   const [dragOverTech, setDragOverTech] = useState(null); 
-
-  // --- HISTÓRICO ---
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [currentHistory, setCurrentHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [formData, setFormData] = useState({ uid: '', cliente: '', telefone: '', endereco: '', tipo: '', data: new Date().toISOString().split('T')[0], horario: 'Manhã', tecnico: '', hora_inicio: '', hora_fim: '' });
 
-  // --- FORM DATA ---
-  const [formData, setFormData] = useState({ 
-    uid: '', 
-    cliente: '', telefone: '', endereco: '', tipo: '', 
-    data: new Date().toISOString().split('T')[0], 
-    horario: 'Manhã', tecnico: '',
-    hora_inicio: '', hora_fim: ''
-  });
+  const initAudio = () => {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioContext();
+    ctx.resume().then(() => { setAudioContext(ctx); setAudioUnlocked(true); playBeep(ctx); });
+  };
 
-  // --- EFEITOS ---
+  const playBeep = (ctxRef = null) => {
+    if (!soundEnabled) return;
+    const ctx = ctxRef || audioContext;
+    if (!ctx) return;
+    try {
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      oscillator.connect(gainNode); gainNode.connect(ctx.destination);
+      oscillator.type = 'sine'; oscillator.frequency.value = 880; 
+      gainNode.gain.setValueAtTime(0.1, ctx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.5);
+      oscillator.start(); oscillator.stop(ctx.currentTime + 0.5);
+    } catch (e) {}
+  };
+
+  const toggleSound = () => { const newState = !soundEnabled; setSoundEnabled(newState); localStorage.setItem('sys3_sound_enabled', newState); };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
@@ -114,9 +92,8 @@ function App() {
         try {
           const userRef = doc(db, "users", currentUser.uid);
           const userSnap = await getDoc(userRef);
-          if (userSnap.exists()) {
-            setUserRole(userSnap.data().role || 'interno');
-          } else {
+          if (userSnap.exists()) setUserRole(userSnap.data().role || 'interno');
+          else {
             const usersColl = await getDocs(collection(db, "users"));
             const newRole = usersColl.empty ? 'admin' : 'interno';
             await setDoc(userRef, { email: currentUser.email, role: newRole });
@@ -132,42 +109,19 @@ function App() {
   useEffect(() => {
     if (user) {
       const q = query(collection(db, "os"), orderBy("data", "asc"));
-      // ... dentro do onSnapshot ...
-      // ... dentro do useEffect ...
       const unsubOS = onSnapshot(q, (snapshot) => {
-        const osListFromDB = snapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
-        setOsList(osListFromDB);
-        
-        // Se NÃO for a primeira carga (ou se já tiver dados carregados antes)
+        setOsList(snapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id })));
         if (!isFirstLoad.current) {
           snapshot.docChanges().forEach((change) => {
             const data = change.doc.data();
-            const autor = data.last_editor || "Sistema"; 
-            
-            // --- DEBUG: ISSO VAI APARECER NO CONSOLE (F12) ---
-            console.log(`⚡ MUDANÇA DETECTADA: [${change.type}]`);
-            console.log(`   Quem fez: ${autor}`);
-            console.log(`   Eu sou: ${user.email}`);
-            
-            // Lógica de Notificação
+            const autor = data.last_editor || "Sistema";
             if ((change.type === "added" || change.type === "modified") && autor !== user.email) {
-              
-              console.log("✅ Condição aceita! Tocando som...");
-              playSound(); 
-
-              if (change.type === "added") {
-                setNotification({ type: 'success', title: 'Nova OS SGP', message: `${data.tipo} - ${data.cliente.split(' ')[0]}`, user: 'SGP' });
-              }
-              if (change.type === "modified") {
-                setNotification({ type: 'info', title: 'Atualização SGP', message: `${data.cliente.split(' ')[0]}: ${data.status}`, user: 'SGP' });
-              }
-            } else {
-              console.log("⛔ Condição negada (Fui eu que fiz ou é carga inicial).");
+              playBeep(); 
+              if (change.type === "added") setNotification({ type: 'success', title: 'Nova OS SGP', message: `${data.tipo} - ${data.cliente.split(' ')[0]}`, user: 'SGP' });
+              if (change.type === "modified") setNotification({ type: 'info', title: 'Atualização SGP', message: `${data.cliente.split(' ')[0]}: ${data.status}`, user: 'SGP' });
             }
           });
         }
-        
-        // Marca que a primeira carga já aconteceu
         isFirstLoad.current = false;
       });
 
@@ -179,45 +133,42 @@ function App() {
           setLimites(data.limites || { instalacao: 2, chamado: 2 });
           setFolgas(Array.isArray(data.folgas) ? data.folgas : []); 
           const tiposRaw = Array.isArray(data.tipos) ? data.tipos : [];
-          const tiposFormatados = tiposRaw.map(t => {
-            if (!t) return null;
-            if (typeof t === 'string') return { nome: t, duracao: '01:00', categoria: 'chamado' };
-            return { nome: t.nome || "Sem Nome", duracao: t.duracao || '01:00', categoria: t.categoria || 'chamado' }; 
-          }).filter(t => t !== null);
-          setListaTipos(tiposFormatados);
-        } else {
-          setDoc(docRef, { tecnicos: ['Técnico 1'], limites: { instalacao: 2, chamado: 2 }, tipos: [], folgas: [] });
-        }
+          setListaTipos(tiposRaw.map(t => typeof t === 'string' ? { nome: t, duracao: '01:00', categoria: 'chamado' } : { nome: t.nome || "Sem Nome", duracao: t.duracao || '01:00', categoria: t.categoria || 'chamado' }));
+        } else { setDoc(docRef, { tecnicos: ['Técnico 1'], limites: { instalacao: 2, chamado: 2 }, tipos: [], folgas: [] }); }
       });
 
       let unsubUsers = () => {};
       if (userRole === 'admin') {
         const qUsers = query(collection(db, "users"));
-        unsubUsers = onSnapshot(qUsers, (snap) => {
-          const usersSafe = snap.docs.map(d => ({ uid: d.id, email: d.data().email || "Sem Email", role: d.data().role || "interno" }));
-          setUsuariosSistema(usersSafe);
-        });
+        unsubUsers = onSnapshot(qUsers, (snap) => setUsuariosSistema(snap.docs.map(d => ({ uid: d.id, email: d.data().email || "Sem Email", role: d.data().role || "interno" }))));
       }
       return () => { unsubOS(); unsubConfig(); unsubUsers(); };
     }
   }, [user, userRole]);
 
-  // --- HELPERS ---
+  // --- LOG GLOBAL ---
+  const registrarLogGlobal = async (tipo, titulo, detalhe, osId = null) => {
+      if (!user) return;
+      try {
+          await addDoc(collection(db, "global_logs"), {
+              timestamp: new Date().toISOString(),
+              tipo, // nova_os, status, edicao, conclusao, sistema
+              titulo,
+              detalhe,
+              usuario: user.email.split('@')[0],
+              os_id: osId
+          });
+      } catch (e) { console.error("Erro ao gravar log global", e); }
+  };
+
+  // Helpers
   const getCategoria = (nomeTipo) => {
     if (!listaTipos || listaTipos.length === 0) return 'chamado';
     const tipo = listaTipos.find(t => t.nome === nomeTipo);
-    if (!tipo) {
-      const lower = (nomeTipo || "").toLowerCase();
-      if (lower.includes('instala') || lower.includes('transf')) return 'instalacao';
-      return 'chamado';
-    }
+    if (!tipo) { const lower = (nomeTipo || "").toLowerCase(); return (lower.includes('instala') || lower.includes('transf')) ? 'instalacao' : 'chamado'; }
     return tipo.categoria || 'chamado';
   };
-
-  const getFolgaInfo = (techName, dateStr) => {
-    return folgas.find(f => f.tecnico === techName && f.data === dateStr);
-  };
-
+  const getFolgaInfo = (techName, dateStr) => folgas.find(f => f.tecnico === techName && f.data === dateStr);
   const checkCapacity = (techName, dateStr, turno, tipoServico, ignoreUid = null) => {
     if (!techName || techName === "") return true;
     const folga = getFolgaInfo(techName, dateStr);
@@ -225,141 +176,177 @@ function App() {
     const limiteInstalacao = folga ? Number(folga.limite) : (limites?.instalacao || 2);
     const limiteChamado = folga ? Number(folga.limite) : (limites?.chamado || 2);
     const limiteAtual = categoriaAtual === 'instalacao' ? limiteInstalacao : limiteChamado;
-
-    if (limiteAtual === 0) {
-      alert(`🚫 TÉCNICO DE FOLGA!\n\n${techName} está de folga no dia ${new Date(dateStr).toLocaleDateString('pt-BR')}.`);
-      return false;
-    }
+    if (limiteAtual === 0) return window.confirm(`🚫 TÉCNICO DE FOLGA!\n\n${techName} está marcado com folga total.\nDeseja forçar o agendamento?`);
     const count = osList.filter(os => os.tecnico === techName && os.data === dateStr && os.horario === turno && getCategoria(os.tipo) === categoriaAtual && os.uid !== ignoreUid).length;
-    if (count >= limiteAtual) {
-      alert(`🚫 CAPACIDADE EXCEDIDA!\n\nLimite para ${techName} neste dia/turno: ${limiteAtual}.`);
-      return false;
-    }
+    if (count >= limiteAtual) return window.confirm(`⚠️ CAPACIDADE EXCEDIDA para ${techName}!\nLimite: ${limiteAtual} | Agendados: ${count}\nDeseja realizar um ENCAIXE?`);
     return true;
   };
-
+  const ehAtividadeOperacional = (os) => {
+      const t = (os.tipo || "").toLowerCase();
+      if (t.includes('retirada') || t.includes('cancel') || t.includes('inviabil') || t.includes('reducao') || t.includes('desistencia')) return false;
+      return true;
+  };
+  const getTecnicosOciosos = () => {
+      const now = new Date();
+      const hour = now.getHours();
+      if (hour < 8 || hour >= 18) return [];
+      const hoje = new Date().toISOString().split('T')[0];
+      const ociosos = [];
+      listaTecnicos.forEach(tec => {
+          const folga = getFolgaInfo(tec, hoje);
+          if (folga && Number(folga.limite) === 0) return;
+          const temTrabalho = osList.filter(os => os.data === hoje && os.tecnico === tec).some(os => os.status === 'Em Execução' || os.status === 'Pendente' || os.status === 'Aberta');
+          if (!temTrabalho) ociosos.push(tec);
+      });
+      return ociosos;
+  };
   const checkExpediente = (horaFim, osDate) => {
-    if (osDate) { const diaSemana = new Date(osDate).getUTCDay(); if (diaSemana === 0) { alert("⚠️ ALERTA: Domingo."); return; } }
+    if (osDate) { const diaSemana = new Date(osDate).getUTCDay(); if (diaSemana === 0) alert("⚠️ ALERTA: Domingo."); }
     if (horaFim) { const [hora, minuto] = horaFim.split(':').map(Number); if (hora > 18 || (hora === 18 && minuto > 0)) alert(`⚠️ ALERTA: Hora Extra.`); }
   };
-
   const sendWhatsApp = (telefone, cliente, tipo) => {
     if (!telefone) return alert("Telefone não cadastrado.");
-    const num = telefone.replace(/\D/g, ''); 
-    window.open(`https://wa.me/55${num}?text=${encodeURIComponent(`Olá ${cliente.split(' ')[0]}, técnico da Sys3 a caminho para ${tipo}.`)}`, '_blank');
+    window.open(`https://wa.me/55${telefone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${cliente.split(' ')[0]}, técnico da Sys3 a caminho para ${tipo}.`)}`, '_blank');
   };
-
   const applyFilters = (lista) => {
     let result = lista || [];
     if (filter !== 'Todos') result = result.filter(os => os.status === filter);
-    if (searchTerm) {
-      const lowerTerm = searchTerm.toLowerCase();
-      result = result.filter(os => os.cliente.toLowerCase().includes(lowerTerm) || os.endereco.toLowerCase().includes(lowerTerm) || (os.tecnico && os.tecnico.toLowerCase().includes(lowerTerm)));
-    }
-    return result;
+    if (searchTerm) { const lower = searchTerm.toLowerCase(); result = result.filter(os => os.cliente.toLowerCase().includes(lower) || os.endereco.toLowerCase().includes(lower) || (os.tecnico && os.tecnico.toLowerCase().includes(lower))); }
+    return result.filter(ehAtividadeOperacional);
   };
-
-  const isTecnicoConhecido = (tecName) => {
-    if (!tecName) return false;
-    return listaTecnicos.includes(tecName);
-  };
-
-  // --- ACTIONS ---
+  const isTecnicoConhecido = (tecName) => listaTecnicos.includes(tecName);
   const handleLogin = async (email, password) => { try { await signInWithEmailAndPassword(auth, email, password); } catch (e) { setLoginError("Erro login"); } };
-  const handleLogout = async () => await signOut(auth);
-  
+  const handleLogout = async () => { setAudioUnlocked(false); await signOut(auth); };
   const registrarHistorico = async (osId, acao, detalhe) => { if (!user) return; try { await addDoc(collection(db, "os", osId, "historico"), { data: new Date().toISOString(), usuario: user.email, acao, detalhe }); } catch (e) {} };
   const verHistorico = async (osId) => { setLoadingHistory(true); setIsHistoryModalOpen(true); setCurrentHistory([]); try { const q = query(collection(db, "os", osId, "historico"), orderBy("data", "desc")); const snap = await getDocs(q); setCurrentHistory(snap.docs.map(d => d.data())); } catch (e) { alert("Erro histórico"); } setLoadingHistory(false); };
   
-  const handleEditOS = (os) => {
-    setFormData({
-      uid: os.uid,
-      cliente: os.cliente || '',
-      telefone: os.telefone || '',
-      endereco: os.endereco || '',
-      tipo: os.tipo || '',
-      data: os.data || new Date().toISOString().split('T')[0],
-      horario: os.horario || 'Manhã',
-      tecnico: os.tecnico || '',
-      hora_inicio: os.hora_inicio || '',
-      hora_fim: os.hora_fim || ''
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleSaveOS = async (e) => {
-    e.preventDefault();
-    if (!checkCapacity(formData.tecnico, formData.data, formData.horario, formData.tipo, formData.uid)) return;
-    try {
-      checkExpediente(formData.hora_fim, formData.data);
-      const dadosParaSalvar = {
-        cliente: formData.cliente, telefone: formData.telefone, endereco: formData.endereco,
-        tipo: formData.tipo, data: formData.data, horario: formData.horario,
-        tecnico: formData.tecnico, hora_inicio: formData.hora_inicio, hora_fim: formData.hora_fim,
-        last_editor: user.email,
-        sync_pendente: true // Flag de sincronização
-      };
-      if (formData.uid) {
-        await updateDoc(doc(db, "os", formData.uid), dadosParaSalvar);
-        await registrarHistorico(formData.uid, "Edição Completa", `Atualizado por ${user.email}`);
-      } else {
-        const docRef = await addDoc(collection(db, "os"), { id: Date.now(), ...dadosParaSalvar, status: 'Pendente' });
-        await registrarHistorico(docRef.id, "Criação", `OS criada por ${user.email}`);
-      }
-      setIsModalOpen(false);
-      setFormData({ uid: '', cliente: '', telefone: '', endereco: '', tipo: listaTipos[0]?.nome || '', data: new Date().toISOString().split('T')[0], horario: 'Manhã', tecnico: '', hora_inicio: '', hora_fim: '' });
-    } catch (e) { console.error(e); alert("Erro ao salvar."); }
-  };
-
-  const handleUpdateStatus = async (uid, novoStatus) => { await updateDoc(doc(db, "os", uid), { status: novoStatus, last_editor: user.email, sync_pendente: true }); await registrarHistorico(uid, "Status", novoStatus); };
+  // --- ACTIONS COM LOG GLOBAL ---
   
-  const handleUpdateField = async (uid, field, value, currentOS = null) => {
-    if (currentOS) {
-      if (field === 'tecnico' && !checkCapacity(value, currentOS.data, currentOS.horario, currentOS.tipo, uid)) return;
-      if (field === 'horario' && !checkCapacity(currentOS.tecnico, currentOS.data, value, currentOS.tipo, uid)) return;
-    }
-    let updateData = { [field]: value, last_editor: user.email, sync_pendente: true };
-    let acao = "Edição";
-    if (field === 'hora_inicio' && currentOS) {
-      acao = "Apontamento";
-      const configTipo = listaTipos.find(t => t.nome === currentOS.tipo);
-      if (configTipo) { const novoFim = addTimes(value, configTipo.duracao); updateData.hora_fim = novoFim; checkExpediente(novoFim, currentOS.data); }
-    } else if (field === 'hora_fim') { checkExpediente(value, currentOS?.data); }
-    if (field === 'tecnico') acao = "Atribuição"; 
-    await updateDoc(doc(db, "os", uid), updateData);
-    await registrarHistorico(uid, acao, `${field} -> ${value}`);
+  const handleEditOS = (os) => { setFormData({ uid: os.uid, cliente: os.cliente || '', telefone: os.telefone || '', endereco: os.endereco || '', tipo: os.tipo || '', data: os.data || new Date().toISOString().split('T')[0], horario: os.horario || 'Manhã', tecnico: os.tecnico || '', hora_inicio: os.hora_inicio || '', hora_fim: os.hora_fim || '' }); setIsModalOpen(true); };
+  
+  const handleSaveOS = async (e) => { 
+      e.preventDefault(); 
+      if (!checkCapacity(formData.tecnico, formData.data, formData.horario, formData.tipo, formData.uid)) return; 
+      try { 
+          checkExpediente(formData.hora_fim, formData.data); 
+          const dados = { cliente: formData.cliente, telefone: formData.telefone, endereco: formData.endereco, tipo: formData.tipo, data: formData.data, horario: formData.horario, tecnico: formData.tecnico, hora_inicio: formData.hora_inicio, hora_fim: formData.hora_fim, last_editor: user.email, sync_pendente: true }; 
+          
+          if (formData.uid) { 
+              await updateDoc(doc(db, "os", formData.uid), dados); 
+              await registrarHistorico(formData.uid, "Edição Completa", `Atualizado por ${user.email}`);
+              await registrarLogGlobal("edicao", "OS Editada", `Cliente: ${formData.cliente} (${formData.tipo})`, formData.uid);
+          } else { 
+              const docRef = await addDoc(collection(db, "os"), { id: Date.now(), ...dados, status: 'Pendente' }); 
+              await registrarHistorico(docRef.id, "Criação", `OS criada por ${user.email}`); 
+              await registrarLogGlobal("nova_os", "Nova OS Criada", `${formData.tipo} para ${formData.cliente}`, docRef.id);
+          } 
+          setIsModalOpen(false); 
+          setFormData({ uid: '', cliente: '', telefone: '', endereco: '', tipo: listaTipos[0]?.nome || '', data: new Date().toISOString().split('T')[0], horario: 'Manhã', tecnico: '', hora_inicio: '', hora_fim: '' }); 
+      } catch (e) { console.error(e); alert("Erro ao salvar."); } 
   };
 
-  const handleUpdateDate = async (uid, novaData, dataAntiga) => { if (!novaData || novaData === dataAntiga) return; const os = osList.find(o => o.uid === uid); if (!checkCapacity(os.tecnico, novaData, os.horario, os.tipo, uid)) return; checkExpediente(os?.hora_fim, novaData); await updateDoc(doc(db, "os", uid), { data: novaData, last_editor: user.email, sync_pendente: true }); await registrarHistorico(uid, "Reagendamento", `Para ${novaData}`); };
-  const handleDelete = async (uid) => { if (userRole !== 'admin') return alert("Permissão negada."); if(confirm("Excluir?")) await deleteDoc(doc(db, "os", uid)); };
+  const handleUpdateStatus = async (uid, novoStatus) => { 
+      await updateDoc(doc(db, "os", uid), { status: novoStatus, last_editor: user.email, sync_pendente: true }); 
+      await registrarHistorico(uid, "Status", novoStatus);
+      
+      const tipoLog = novoStatus === 'Encerrada' ? 'conclusao' : 'status';
+      const osAtual = osList.find(o => o.uid === uid);
+      await registrarLogGlobal(tipoLog, `Status: ${novoStatus}`, `Técnico: ${osAtual?.tecnico || '?'} - Cliente: ${osAtual?.cliente}`, uid);
+  };
 
-  const handleDragStart = (e, os) => { setDraggedOS(os); }; // Reduzido pois react-dnd cuida do resto
-  const handleDragOverDate = (e, dateStr) => { e.preventDefault(); setDragOverDate(dateStr); };
-  const handleDropDate = async (e, targetDate) => { e.preventDefault(); setDragOverDate(null); if (draggedOS && targetDate) { await handleUpdateDate(draggedOS.uid, targetDate, draggedOS.data); setDraggedOS(null); } };
-  const handleDragOverTech = (e, techName) => { e.preventDefault(); setDragOverTech(techName); };
-  const handleDropTech = async (e, targetTech) => { e.preventDefault(); setDragOverTech(null); if (draggedOS) { if (!checkCapacity(targetTech, draggedOS.data, draggedOS.horario, draggedOS.tipo, draggedOS.uid)) return; await handleUpdateField(draggedOS.uid, 'tecnico', targetTech); setDraggedOS(null); } };
+  // --- NOVA FUNÇÃO: TOGGLE CONFIRMAÇÃO ---
+  const handleToggleConfirm = async (uid, currentStatus) => {
+      try {
+          const novoStatus = !currentStatus;
+          await updateDoc(doc(db, "os", uid), { confirmado: novoStatus });
+          
+          if (novoStatus) {
+              const osAtual = osList.find(o => o.uid === uid);
+              await registrarLogGlobal("status", "Agendamento Confirmado", `Contato realizado com ${osAtual?.cliente}`, uid);
+          }
+      } catch (e) { console.error("Erro ao confirmar:", e); }
+  };
 
-  const handleUpdateLimites = async (campo, valor) => { if (userRole !== 'admin') return; const novos = { ...limites, [campo]: Number(valor) }; setLimites(novos); await updateDoc(doc(db, "configuracoes", "geral"), { limites: novos }); };
-  const handleAddTecnico = async (e) => { e.preventDefault(); if (userRole !== 'admin') return; if(!novoTecnico.trim()) return; await updateDoc(doc(db, "configuracoes", "geral"), { tecnicos: [...listaTecnicos, novoTecnico.trim()] }); setNovoTecnico(""); };
-  const handleRemoveTecnico = async (nome) => { if (userRole !== 'admin') return; if(confirm("Remover?")) await updateDoc(doc(db, "configuracoes", "geral"), { tecnicos: listaTecnicos.filter(t => t !== nome) }); };
-  const handleAddTipo = async (e) => { e.preventDefault(); if (userRole !== 'admin') return; if(!novoTipoNome.trim()) return; const novoObj = { nome: novoTipoNome.trim(), duracao: novoTipoDuracao, categoria: novoTipoCategoria }; await updateDoc(doc(db, "configuracoes", "geral"), { tipos: [...listaTipos, novoObj] }); setNovoTipoNome(""); setNovoTipoDuracao("01:00"); };
-  const handleRemoveTipo = async (nomeAlvo) => { if (userRole !== 'admin') return; if(confirm("Remover?")) { const novaLista = listaTipos.filter(t => t.nome !== nomeAlvo); await updateDoc(doc(db, "configuracoes", "geral"), { tipos: novaLista }); } };
-  const handleToggleRole = async (uid, currentRole) => { if (userRole !== 'admin') return; const newRole = currentRole === 'admin' ? 'interno' : 'admin'; if (confirm(`Alterar cargo para ${newRole}?`)) { await updateDoc(doc(db, "users", uid), { role: newRole }); } };
-  const handleAddFolga = async (e) => { e.preventDefault(); if (userRole !== 'admin') return; if (!folgaTecnico || !folgaData) return alert("Selecione técnico e data."); const exists = folgas.find(f => f.tecnico === folgaTecnico && f.data === folgaData); if (exists) return alert("Já existe uma regra para este técnico nesta data."); const novaFolga = { tecnico: folgaTecnico, data: folgaData, limite: Number(folgaLimite) }; await updateDoc(doc(db, "configuracoes", "geral"), { folgas: [...folgas, novaFolga] }); setFolgaTecnico(""); setFolgaData(""); setFolgaLimite(0); };
+  const handleUpdateField = async (uid, field, value, currentOS = null) => { 
+      if (currentOS) { 
+          if (field === 'tecnico' && !checkCapacity(value, currentOS.data, currentOS.horario, currentOS.tipo, uid)) return; 
+          if (field === 'horario' && !checkCapacity(currentOS.tecnico, currentOS.data, value, currentOS.tipo, uid)) return; 
+      } 
+      let updateData = { [field]: value, last_editor: user.email, sync_pendente: true }; 
+      let acao = "Edição"; 
+      
+      if (field === 'hora_inicio' && currentOS) { 
+          acao = "Apontamento"; 
+          const configTipo = listaTipos.find(t => t.nome === currentOS.tipo); 
+          if (configTipo) { 
+              const novoFim = addTimes(value, configTipo.duracao); 
+              updateData.hora_fim = novoFim; checkExpediente(novoFim, currentOS.data); 
+          } 
+      } else if (field === 'hora_fim') { checkExpediente(value, currentOS?.data); } 
+      
+      if (field === 'tecnico') acao = "Atribuição"; 
+      
+      await updateDoc(doc(db, "os", uid), updateData); 
+      await registrarHistorico(uid, acao, `${field} -> ${value}`);
+      
+      // LOG GLOBAL
+      if (field === 'tecnico') await registrarLogGlobal("edicao", "Troca de Técnico", `De ${currentOS.tecnico} para ${value}`, uid);
+      if (field === 'hora_inicio') await registrarLogGlobal("status", "Início de Execução", `Iniciado às ${value}`, uid);
+  };
+
+  const handleUpdateDate = async (uid, novaData, dataAntiga) => { 
+      if (!novaData || novaData === dataAntiga) return; 
+      const os = osList.find(o => o.uid === uid); 
+      if (!checkCapacity(os.tecnico, novaData, os.horario, os.tipo, uid)) return; 
+      checkExpediente(os?.hora_fim, novaData); 
+      await updateDoc(doc(db, "os", uid), { data: novaData, last_editor: user.email, sync_pendente: true }); 
+      await registrarHistorico(uid, "Reagendamento", `Para ${novaData}`); 
+      await registrarLogGlobal("edicao", "Reagendamento", `De ${formatDataBr(dataAntiga)} para ${formatDataBr(novaData)}`, uid);
+  };
+
+  const handleDelete = async (uid) => { 
+      if (userRole !== 'admin') return alert("Permissão negada."); 
+      if(confirm("Excluir?")) {
+          await deleteDoc(doc(db, "os", uid));
+          await registrarLogGlobal("sistema", "OS Excluída", `ID: ${uid}`, uid);
+      }
+  };
+
+  const handleDragStart = (e, os) => { setDraggedOS(os); }; 
+  const handleDropTech = async (e, targetTech) => { e.preventDefault(); setDragOverTech(null); if (draggedOS) { if (!checkCapacity(targetTech, draggedOS.data, draggedOS.horario, draggedOS.tipo, draggedOS.uid)) return; await handleUpdateField(draggedOS.uid, 'tecnico', targetTech, draggedOS); setDraggedOS(null); } };
+  
+  // Config Actions (Admin)
+  const handleUpdateLimites = async (campo, valor) => { if (userRole !== 'admin') return; const novos = { ...limites, [campo]: Number(valor) }; setLimites(novos); await updateDoc(doc(db, "configuracoes", "geral"), { limites: novos }); }; 
+  const handleAddTecnico = async (e) => { e.preventDefault(); if (userRole !== 'admin') return; if(!novoTecnico.trim()) return; await updateDoc(doc(db, "configuracoes", "geral"), { tecnicos: [...listaTecnicos, novoTecnico.trim()] }); setNovoTecnico(""); }; 
+  const handleRemoveTecnico = async (nome) => { if (userRole !== 'admin') return; if(confirm("Remover?")) await updateDoc(doc(db, "configuracoes", "geral"), { tecnicos: listaTecnicos.filter(t => t !== nome) }); }; 
+  const handleAddTipo = async (e) => { e.preventDefault(); if (userRole !== 'admin') return; if(!novoTipoNome.trim()) return; const novoObj = { nome: novoTipoNome.trim(), duracao: novoTipoDuracao, categoria: novoTipoCategoria }; await updateDoc(doc(db, "configuracoes", "geral"), { tipos: [...listaTipos, novoObj] }); setNovoTipoNome(""); setNovoTipoDuracao("01:00"); }; 
+  const handleRemoveTipo = async (nomeAlvo) => { if (userRole !== 'admin') return; if(confirm("Remover?")) { const novaLista = listaTipos.filter(t => t.nome !== nomeAlvo); await updateDoc(doc(db, "configuracoes", "geral"), { tipos: novaLista }); } }; 
+  const handleToggleRole = async (uid, currentRole) => { if (userRole !== 'admin') return; const newRole = currentRole === 'admin' ? 'interno' : 'admin'; if (confirm(`Alterar cargo para ${newRole}?`)) { await updateDoc(doc(db, "users", uid), { role: newRole }); } }; 
+  const handleAddFolga = async (e) => { e.preventDefault(); if (userRole !== 'admin') return; if (!folgaTecnico || !folgaData) return alert("Selecione técnico e data."); const exists = folgas.find(f => f.tecnico === folgaTecnico && f.data === folgaData); if (exists) return alert("Já existe uma regra para este técnico nesta data."); const novaFolga = { tecnico: folgaTecnico, data: folgaData, limite: Number(folgaLimite) }; await updateDoc(doc(db, "configuracoes", "geral"), { folgas: [...folgas, novaFolga] }); setFolgaTecnico(""); setFolgaData(""); setFolgaLimite(0); }; 
   const handleRemoveFolga = async (tecnico, data) => { if (userRole !== 'admin') return; if (confirm("Remover esta folga/regra?")) { await updateDoc(doc(db, "configuracoes", "geral"), { folgas: folgas.filter(f => !(f.tecnico === tecnico && f.data === data)) }); } };
-
-  const getDaysInMonth = (d) => new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
-  const getFirstDayOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1).getDay();
-  const changeMonth = (offset) => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + offset)));
-  const getTodayOS = () => { const hoje = new Date().toISOString().split('T')[0]; return applyFilters(osList.filter(os => os.data === hoje)); };
-  const getDayOS = (dateStr) => applyFilters(osList.filter(os => os.data === dateStr));
-  const getTechStats = () => { const stats = {}; osList.forEach(os => { const t = os.tecnico?.trim() || 'Sem Técnico'; if(!stats[t]) stats[t] = { total: 0, concluidas: 0, tmaMin: 0, tmaCount: 0 }; stats[t].total++; if(os.status === 'Concluído') { stats[t].concluidas++; if(os.hora_inicio && os.hora_fim) { stats[t].tmaMin += timeToMinutes(calcDuration(os.hora_inicio, os.hora_fim)); stats[t].tmaCount++; } } }); return Object.entries(stats); };
-
+  
+  const getTodayOS = () => { const hoje = new Date().toISOString().split('T')[0]; return applyFilters(osList.filter(os => os.data === hoje)); }; 
+  const getDayOS = (dateStr) => { return applyFilters(osList.filter(os => os.data === dateStr)); };
+  
   if (loadingAuth) return <div className="min-h-screen flex items-center justify-center bg-[#f3f4f6]">Carregando...</div>;
   if (!user) return <Login onLogin={handleLogin} error={loginError} />;
 
+  const tecnicosOciosos = getTecnicosOciosos();
+
+  if (!audioUnlocked) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#f3f4f6] p-4 text-center">
+        <div className="bg-white p-10 rounded-2xl shadow-xl flex flex-col items-center max-w-md w-full border-b-8 border-[#EB6410]">
+          <img src={logoSys3} className="h-16 mb-6 object-contain" alt="Logo" />
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Monitoramento Sys3</h1>
+          <p className="text-gray-500 mb-8">Clique abaixo para ativar o som e iniciar.</p>
+          <button onClick={initAudio} className="w-full bg-[#EB6410] text-white font-bold text-lg py-4 rounded-xl shadow-lg hover:bg-orange-600 transition transform hover:scale-105 flex items-center justify-center gap-3"><PlayCircle size={24} /> INICIAR SISTEMA</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    // 2. DND PROVIDER ENVOLVENDO TUDO
     <DndProvider backend={HTML5Backend}>
       <div className="min-h-screen p-4 md:p-8 font-sans bg-[#f3f4f6] text-[#000000] flex flex-col">
         <NotificationToast notification={notification} onClose={() => setNotification(null)} />
@@ -371,25 +358,13 @@ function App() {
             <button onClick={() => setCurrentTab('hoje')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${currentTab === 'hoje' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Hoje</button>
             <button onClick={() => setCurrentTab('calendario')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${currentTab === 'calendario' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Calendário</button>
             <button onClick={() => setCurrentTab('tecnicos')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${currentTab === 'tecnicos' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Performance</button>
+            <button onClick={() => setCurrentTab('feed')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap flex items-center gap-1 ${currentTab === 'feed' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><ScrollText size={14}/> Atividades</button>
             <button onClick={() => setCurrentTab('dashboard')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 whitespace-nowrap ${currentTab === 'dashboard' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><BarChart3 size={14}/> Comercial</button>
             <button onClick={() => setCurrentTab('config')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 whitespace-nowrap ${currentTab === 'config' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><Settings size={14}/> Config</button>
           </div>
           <div className="flex gap-2 mt-4 md:mt-0">
-            {/* --- NOVO BOTÃO DE SOM --- */}
-            <button 
-              onClick={toggleSound} 
-              className={`px-3 py-2 rounded-lg transition border ${soundEnabled ? 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100' : 'bg-gray-100 text-gray-400 border-transparent hover:bg-gray-200'}`}
-              title={soundEnabled ? "Som Ligado" : "Som Mudo"}
-            >
-              {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
-            </button>
-
-            {/* Botão de Notificações (Já existia) */}
-            <button onClick={() => setShowUpdates(true)} className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-200 relative">
-               <Bell size={18} /> 
-               <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
-            
+             <button onClick={toggleSound} className={`px-3 py-2 rounded-lg transition border ${soundEnabled ? 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100' : 'bg-gray-100 text-gray-400 border-transparent hover:bg-gray-200'}`} title={soundEnabled ? "Som Ligado" : "Som Mudo"}>{soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>
+            <button onClick={() => setShowUpdates(true)} className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-200 relative"><Bell size={18} /> <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full"></span></button>
             <button onClick={() => { setFormData({ uid: '', cliente: '', telefone: '', endereco: '', tipo: listaTipos[0]?.nome || '', data: new Date().toISOString().split('T')[0], horario: 'Manhã', tecnico: '', hora_inicio: '', hora_fim: '' }); setIsModalOpen(true); }} className="bg-[#EB6410] text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:opacity-90"><ClipboardList size={18} /> Nova OS</button>
             <button onClick={handleLogout} className="bg-gray-200 text-gray-600 px-3 py-2 rounded-lg"><LogOut size={18} /></button>
           </div>
@@ -399,59 +374,124 @@ function App() {
 
         {currentTab === 'hoje' && (
           <div className="flex-1 overflow-x-auto pb-4">
-             <div className="flex flex-col md:flex-row justify-between items-center mb-4 px-1 gap-4">
-               <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-lg shadow-sm"><Clock className="text-[#EB6410]" size={20}/><span className="font-bold text-gray-700">Dia: {new Date().toLocaleDateString('pt-BR')}</span></div>
-               <div className="flex-1 max-w-md relative"><input type="text" placeholder="Buscar..." className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:border-[#EB6410] outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /><Search className="absolute left-3 top-2.5 text-gray-400" size={18} /></div>
-               <div className="flex gap-2 bg-white p-1 rounded-lg shadow-sm">{['Todos', 'Aberta', 'Pendente', 'Em Execução', 'Encerrada'].map(st => <button key={st} onClick={() => setFilter(st)} className={`px-3 py-1 rounded text-xs font-bold transition ${filter === st ? 'bg-[#DFDAC6] text-[#EB6410]' : 'text-gray-500 hover:bg-gray-50'}`}>{st}</button>)}</div>
-             </div>
-             <div className="flex gap-4 min-w-full items-start">
-                
-                {/* COLUNA A DEFINIR - MOSTRA OS NÃO CADASTRADOS TAMBÉM */}
-                <div onDragOver={(e) => handleDragOverTech(e, '')} onDrop={(e) => handleDropTech(e, '')} className={`min-w-[300px] w-[300px] bg-gray-100 rounded-xl p-3 border-2 transition-colors ${dragOverTech === '' ? 'border-[#EB6410] bg-orange-50' : 'border-transparent'}`}>
-                  <div className="flex justify-between items-center mb-3 px-1"><h3 className="font-bold text-gray-600 flex items-center gap-2"><User size={16}/> A Definir / Outros</h3><span className="bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">
-                    {getTodayOS().filter(os => !isTecnicoConhecido(os.tecnico)).length}
-                  </span></div>
-                  
-                  <div className="space-y-2">
-                    {getTodayOS().filter(os => !isTecnicoConhecido(os.tecnico)).map(os => (
-                      <div key={os.uid}>
-                        {os.tecnico && !isTecnicoConhecido(os.tecnico) && (
-                          <div className="text-[10px] bg-yellow-100 text-yellow-800 px-2 py-1 rounded mb-1 text-center font-bold">
-                            ⚠️ SGP: {os.tecnico}
+              {tecnicosOciosos.length > 0 && (
+                  <div className="mb-4 bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded-r-lg shadow-sm flex items-center justify-between animate-pulse">
+                      <div className="flex items-center gap-3">
+                          <UserCheck size={24} className="text-yellow-700"/>
+                          <div>
+                              <h3 className="font-bold text-yellow-800 text-sm uppercase">Radar de Ociosidade Ativo</h3>
+                              <p className="text-xs text-yellow-700">Técnicos sem atividade agora: <span className="font-bold">{tecnicosOciosos.join(', ')}</span></p>
                           </div>
-                        )}
-                        <OSCard key={os.uid} os={os} handleEditOS={handleEditOS} handleDragStart={handleDragStart} handleUpdateDate={handleUpdateDate} handleUpdateField={handleUpdateField} handleUpdateStatus={handleUpdateStatus} handleDelete={handleDelete} verHistorico={verHistorico} listaTecnicos={listaTecnicos} sendWhatsApp={sendWhatsApp} userRole={userRole} />
                       </div>
-                    ))}
+                      <button onClick={() => { setFormData({ uid: '', cliente: '', telefone: '', endereco: '', tipo: listaTipos[0]?.nome || '', data: new Date().toISOString().split('T')[0], horario: 'Manhã', tecnico: tecnicosOciosos[0] || '', hora_inicio: '', hora_fim: '' }); setIsModalOpen(true); }} className="bg-yellow-500 text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-yellow-600 transition">
+                          Atribuir OS
+                      </button>
                   </div>
-                </div>
+              )}
 
-                {/* COLUNAS TÉCNICOS CADASTRADOS */}
-                {(listaTecnicos || []).map(tec => {
-                  const hojeStr = new Date().toISOString().split('T')[0];
-                  const folgaHoje = getFolgaInfo(tec, hojeStr);
-                  const isFolgaTotal = folgaHoje && Number(folgaHoje.limite) === 0;
-                  return (
-                    <div key={tec} onDragOver={(e) => !isFolgaTotal && handleDragOverTech(e, tec)} onDrop={(e) => !isFolgaTotal && handleDropTech(e, tec)} className={`min-w-[300px] w-[300px] rounded-xl p-3 border-2 transition-colors ${isFolgaTotal ? 'bg-red-50 border-red-200 opacity-90 cursor-not-allowed' : (dragOverTech === tec ? 'border-[#EB6410] bg-orange-50' : 'border-transparent bg-gray-100')}`}>
-                      <div className="flex justify-between items-center mb-3 px-1"><h3 className={`font-bold flex items-center gap-2 uppercase truncate ${isFolgaTotal ? 'text-red-600' : 'text-[#EB6410]'}`}><User size={16}/> {tec}{isFolgaTotal && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full flex items-center gap-1"><CalendarOff size={10}/></span>}</h3><span className={`${isFolgaTotal ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'} text-xs font-bold px-2 py-0.5 rounded-full`}>{getTodayOS().filter(os => os.tecnico === tec).length}</span></div>
-                      {folgaHoje && (<div className={`p-3 mb-3 rounded-lg border-l-4 shadow-sm flex items-center gap-3 animate-fade-in ${Number(folgaHoje.limite) === 0 ? 'bg-red-50 border-red-500' : 'bg-yellow-50 border-yellow-500'}`}><div className={`p-2 rounded-full ${Number(folgaHoje.limite) === 0 ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>{Number(folgaHoje.limite) === 0 ? <Coffee size={20}/> : <AlertTriangle size={20}/>}</div><div><h4 className={`text-xs font-bold uppercase ${Number(folgaHoje.limite) === 0 ? 'text-red-700' : 'text-yellow-700'}`}>{Number(folgaHoje.limite) === 0 ? 'Folga Total' : 'Escala Ajustada'}</h4><p className="text-[10px] text-gray-500 font-medium leading-tight">{Number(folgaHoje.limite) === 0 ? 'Indisponível hoje.' : `Capacidade: ${folgaHoje.limite} vagas.`}</p></div></div>)}
-                      <div className="space-y-2">{getTodayOS().filter(os => os.tecnico === tec).map(os => <OSCard key={os.uid} os={os} handleEditOS={handleEditOS} handleDragStart={handleDragStart} handleUpdateDate={handleUpdateDate} handleUpdateField={handleUpdateField} handleUpdateStatus={handleUpdateStatus} handleDelete={handleDelete} verHistorico={verHistorico} listaTecnicos={listaTecnicos} sendWhatsApp={sendWhatsApp} userRole={userRole} />)}</div>
-                    </div>
-                  );
-                })}
-             </div>
+              <div className="flex flex-col md:flex-row justify-between items-center mb-4 px-1 gap-4">
+                <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-lg shadow-sm"><Clock className="text-[#EB6410]" size={20}/><span className="font-bold text-gray-700">Dia: {new Date().toLocaleDateString('pt-BR')}</span></div>
+                <div className="flex-1 max-w-md relative"><input type="text" placeholder="Buscar..." className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:border-[#EB6410] outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /><Search className="absolute left-3 top-2.5 text-gray-400" size={18} /></div>
+                <div className="flex gap-2 bg-white p-1 rounded-lg shadow-sm">{['Todos', 'Aberta', 'Pendente', 'Em Execução', 'Encerrada'].map(st => <button key={st} onClick={() => setFilter(st)} className={`px-3 py-1 rounded text-xs font-bold transition ${filter === st ? 'bg-[#DFDAC6] text-[#EB6410]' : 'text-gray-500 hover:bg-gray-50'}`}>{st}</button>)}</div>
+              </div>
+              <div className="flex gap-4 min-w-full items-start">
+                 <div className={`min-w-[300px] w-[300px] bg-gray-100 rounded-xl p-3 border-2 border-transparent`}>
+                   <div className="flex justify-between items-center mb-3 px-1"><h3 className="font-bold text-gray-600 flex items-center gap-2"><User size={16}/> A Definir / Outros</h3><span className="bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">{getTodayOS().filter(os => !isTecnicoConhecido(os.tecnico)).length}</span></div>
+                   <div className="space-y-2">{getTodayOS().filter(os => !isTecnicoConhecido(os.tecnico)).map(os => (<div key={os.uid}>{os.tecnico && !isTecnicoConhecido(os.tecnico) && (<div className="text-[10px] bg-yellow-100 text-yellow-800 px-2 py-1 rounded mb-1 text-center font-bold">⚠️ SGP: {os.tecnico}</div>)}<OSCard key={os.uid} os={os} handleEditOS={handleEditOS} handleDragStart={handleDragStart} handleUpdateDate={handleUpdateDate} handleUpdateField={handleUpdateField} handleUpdateStatus={handleUpdateStatus} handleDelete={handleDelete} verHistorico={verHistorico} listaTecnicos={listaTecnicos} sendWhatsApp={sendWhatsApp} userRole={userRole} handleToggleConfirm={handleToggleConfirm} /></div>))}</div>
+                 </div>
+                 {(listaTecnicos || []).map(tec => {
+                   const hojeStr = new Date().toISOString().split('T')[0];
+                   const folgaHoje = getFolgaInfo(tec, hojeStr);
+                   const isFolgaTotal = folgaHoje && Number(folgaHoje.limite) === 0;
+                   const isOcioso = tecnicosOciosos.includes(tec); 
+                   return (
+                     <div key={tec} onDrop={(e) => !isFolgaTotal && handleDropTech(e, tec)} onDragOver={(e) => e.preventDefault()} className={`min-w-[300px] w-[300px] rounded-xl p-3 border-2 transition-colors ${isFolgaTotal ? 'bg-red-50 border-red-200 opacity-90 cursor-not-allowed' : 'border-transparent bg-gray-100'}`}>
+                       <div className="flex justify-between items-center mb-3 px-1">
+                           <div className="flex items-center gap-2 overflow-hidden">
+                               <h3 className={`font-bold flex items-center gap-2 uppercase truncate ${isFolgaTotal ? 'text-red-600' : 'text-[#EB6410]'}`}><User size={16}/> {tec}</h3>
+                               {isOcioso && <span className="text-[8px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded border border-green-200 animate-pulse">LIVRE</span>}
+                           </div>
+                           <span className={`${isFolgaTotal ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'} text-xs font-bold px-2 py-0.5 rounded-full`}>{getTodayOS().filter(os => os.tecnico === tec).length}</span>
+                       </div>
+                       {folgaHoje && (<div className={`p-3 mb-3 rounded-lg border-l-4 shadow-sm flex items-center gap-3 animate-fade-in ${Number(folgaHoje.limite) === 0 ? 'bg-red-50 border-red-500' : 'bg-yellow-50 border-yellow-500'}`}><div className={`p-2 rounded-full ${Number(folgaHoje.limite) === 0 ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>{Number(folgaHoje.limite) === 0 ? <Coffee size={20}/> : <AlertTriangle size={20}/>}</div><div><h4 className={`text-xs font-bold uppercase ${Number(folgaHoje.limite) === 0 ? 'text-red-700' : 'text-yellow-700'}`}>{Number(folgaHoje.limite) === 0 ? 'Folga Total' : 'Escala Ajustada'}</h4><p className="text-[10px] text-gray-500 font-medium leading-tight">{Number(folgaHoje.limite) === 0 ? 'Indisponível hoje.' : `Capacidade: ${folgaHoje.limite} vagas.`}</p></div></div>)}
+                       <div className="space-y-2">{getTodayOS().filter(os => os.tecnico === tec).map(os => <OSCard key={os.uid} os={os} handleEditOS={handleEditOS} handleDragStart={handleDragStart} handleUpdateDate={handleUpdateDate} handleUpdateField={handleUpdateField} handleUpdateStatus={handleUpdateStatus} handleDelete={handleDelete} verHistorico={verHistorico} listaTecnicos={listaTecnicos} sendWhatsApp={sendWhatsApp} userRole={userRole} handleToggleConfirm={handleToggleConfirm} />)}</div>
+                     </div>
+                   );
+                 })}
+              </div>
           </div>
         )}
 
-        {/* RESTO DO CONTEÚDO (Mantido Igual) */}
-        {currentTab === 'calendario' && (<div className="bg-white p-6 rounded-xl shadow-sm"><div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold flex items-center gap-2 text-[#EB6410]"><CalIcon /> Visão Macro</h2><div className="flex items-center gap-4 bg-gray-100 rounded-lg p-1"><button onClick={() => changeMonth(-1)} className="p-2 hover:bg-white rounded shadow-sm"><ChevronLeft size={20}/></button><span className="font-bold w-32 text-center capitalize">{currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</span><button onClick={() => changeMonth(1)} className="p-2 hover:bg-white rounded shadow-sm"><ChevronRight size={20}/></button></div></div><div className="grid grid-cols-7 gap-2 mb-2">{['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d => <div key={d} className="text-center text-sm font-bold text-gray-400 py-2">{d}</div>)}</div><div className="grid grid-cols-7 gap-2">{Array.from({ length: getFirstDayOfMonth(currentMonth) }).map((_, i) => <div key={`empty-${i}`} className="h-28 bg-gray-50/50 rounded-lg"></div>)}{Array.from({ length: getDaysInMonth(currentMonth) }).map((_, i) => { const day = i + 1; const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth()+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; const osDoDia = applyFilters(osList.filter(os => os.data === dateStr)); const isDragOver = dragOverDate === dateStr; const folgasDoDia = folgas.filter(f => f.data === dateStr); return (<div key={day} onDragOver={(e) => handleDragOverDate(e, dateStr)} onDrop={(e) => handleDropDate(e, dateStr)} onClick={() => setSelectedDay(dateStr)} className={`h-28 border rounded-lg p-2 flex flex-col transition duration-200 ${userRole === 'admin' ? 'cursor-pointer hover:shadow-md' : ''} ${isDragOver ? 'bg-orange-100 border-[#EB6410] scale-105 shadow-lg z-10' : 'hover:border-[#EB6410]'} ${osDoDia.length > 0 ? 'bg-white' : 'bg-gray-50 text-gray-300'}`}><div className="flex justify-between items-start mb-1"><span className="font-bold text-sm">{day}</span>{folgasDoDia.length > 0 && (<div className="flex flex-col gap-0.5 items-end max-w-[60%]">{folgasDoDia.map((f, idx) => (<span key={idx} className={`text-[8px] px-1 rounded truncate w-full text-right ${Number(f.limite)===0 ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-700'}`}>{Number(f.limite)===0 ? '🚫' : '⚠️'} {f.tecnico.split(' ')[0]}</span>))}</div>)}</div><div className="flex-1 overflow-y-auto custom-scrollbar space-y-1">{osDoDia.map(os => (<div key={os.uid} draggable={userRole==='admin'} onDragStart={(e) => handleDragStart(e, os)} onClick={(e) => e.stopPropagation()} className={`text-[10px] px-1 py-1 rounded border truncate cursor-grab active:cursor-grabbing shadow-sm flex items-center gap-1 ${os.status === 'Concluído' ? 'bg-green-100 border-green-200 text-green-800' : os.status === 'Cancelado' ? 'bg-red-100 border-red-200 text-red-800' : 'bg-white border-orange-100 text-gray-700 hover:bg-orange-50'}`}><GripHorizontal size={10} className="text-gray-300"/><span className="font-bold text-[#EB6410]">{os.horario === 'Manhã' ? 'M' : 'T'}</span><span>{os.cliente.split(' ')[0]}</span></div>))}</div></div>)})}</div></div>)}
-        {currentTab === 'tecnicos' && (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{getTechStats().map(([nome, dados]) => { const avgMinutes = dados.tmaCount > 0 ? Math.floor(dados.tmaMin / dados.tmaCount) : 0; return (<div key={nome} className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-[#EB6410] hover:shadow-md transition"><div className="flex justify-between items-start mb-4"><div className="bg-gray-100 p-3 rounded-full"><User className="text-[#EB6410]" size={24}/></div><div className="text-right"><p className="text-xs text-gray-500 font-bold uppercase">Total OS</p><p className="text-2xl font-bold text-[#EB6410]">{dados.total}</p></div></div><h3 className="text-lg font-bold mb-4">{nome}</h3><div className="space-y-3"><div className="flex justify-between items-center text-sm"><span className="flex items-center gap-2 text-gray-600"><CheckCircle size={16} className="text-green-500"/> Finalizadas</span><span className="font-bold">{dados.concluidas}</span></div><div className="bg-orange-50 p-3 rounded-lg border border-orange-100 mt-2"><p className="text-xs font-bold text-[#EB6410] uppercase mb-1">Tempo Médio (TMA)</p><p className="text-xl font-extrabold text-gray-800 flex items-center gap-2"><Timer size={20} className="text-gray-400"/> {Math.floor(avgMinutes/60)}h {avgMinutes%60}m</p></div></div></div>) })}</div>)}
+        {currentTab === 'calendario' && <CalendarioVagas onDayClick={setSelectedDay} />}
+        {currentTab === 'tecnicos' && <PerformanceTecnica osList={osList} listaTecnicos={listaTecnicos} />}
+        {currentTab === 'feed' && <ActivityFeed />} 
         {currentTab === 'dashboard' && <Dashboard />}
         {currentTab === 'config' && (<div className="grid grid-cols-1 lg:grid-cols-2 gap-8">{userRole !== 'admin' && (<div className="col-span-full bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 rounded-md flex items-center gap-2"><Lock size={20} /><div><p className="font-bold">Modo de Visualização</p><p className="text-xs">Apenas administradores podem alterar configurações.</p></div></div>)}<div className="space-y-6"><div className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-[#EB6410]"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><User className="text-[#EB6410]" /> Equipe Técnica</h2>{userRole === 'admin' && (<form onSubmit={handleAddTecnico} className="flex gap-2 mb-6"><input type="text" placeholder="Nome" className="flex-1 border-2 rounded-lg px-4 py-2" value={novoTecnico} onChange={e => setNovoTecnico(e.target.value)} /><button type="submit" className="bg-[#EB6410] text-white px-4 rounded-lg"><Plus/></button></form>)}<div className="space-y-2">{(listaTecnicos || []).map((tec, idx) => (<div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border hover:border-[#EB6410]"><span className="font-medium">{tec}</span>{userRole === 'admin' && <button onClick={() => handleRemoveTecnico(tec)} className="text-gray-400 hover:text-red-500"><Trash2 size={18}/></button>}</div>))}</div></div><div className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-red-500"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Coffee className="text-red-500" /> Escala de Folgas</h2>{userRole === 'admin' && (<form onSubmit={handleAddFolga} className="bg-red-50 p-4 rounded-lg mb-4 border border-red-100"><div className="grid grid-cols-2 gap-3 mb-3"><select className="border rounded px-2 py-1.5 w-full bg-white" value={folgaTecnico} onChange={e => setFolgaTecnico(e.target.value)}><option value="">Selecione Técnico...</option>{(listaTecnicos || []).map(t => <option key={t} value={t}>{t}</option>)}</select><input type="date" className="border rounded px-2 py-1.5 w-full" value={folgaData} onChange={e => setFolgaData(e.target.value)} /></div><div className="flex gap-2 items-center"><label className="text-xs font-bold text-red-700">Vagas Disponíveis:</label><input type="number" min="0" max="10" className="border rounded w-16 px-2 py-1 text-center font-bold" value={folgaLimite} onChange={e => setFolgaLimite(e.target.value)} /><span className="text-xs text-gray-500">(0 = Folga Total)</span><button type="submit" className="ml-auto bg-red-500 text-white px-3 py-1 rounded text-xs font-bold hover:bg-red-600">Agendar</button></div></form>)}<div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">{(folgas || []).map((f, idx) => (<div key={idx} className="flex justify-between items-center p-2 bg-white rounded border border-red-100 text-sm"><div><span className="font-bold text-gray-700">{f.tecnico}</span><span className="mx-2 text-gray-300">|</span><span>{new Date(f.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</span><span className={`ml-2 text-[10px] font-bold px-2 py-0.5 rounded ${Number(f.limite)===0 ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-700'}`}>{Number(f.limite) === 0 ? 'FOLGA TOTAL' : `${f.limite} VAGAS`}</span></div>{userRole === 'admin' && <button onClick={() => handleRemoveFolga(f.tecnico, f.data)} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>}</div>))}</div></div>{userRole === 'admin' && (<div className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-gray-700"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Shield className="text-gray-700" /> Acesso de Usuários</h2><div className="space-y-2">{(usuariosSistema || []).map((u) => (<div key={u.uid} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border"><div className="flex flex-col"><span className="font-bold text-sm text-gray-800">{u.email}</span><span className={`text-xs font-bold uppercase ${u.role === 'admin' ? 'text-green-600' : 'text-gray-500'}`}>{u.role}</span></div>{u.email !== user.email && (<button onClick={() => handleToggleRole(u.uid, u.role)} className="text-xs bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded font-bold transition">Mudar Cargo</button>)}</div>))}</div></div>)}</div><div className="space-y-6"><div className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-purple-500"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Activity className="text-purple-500" /> Regras Globais</h2><div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-gray-600 mb-1">Max. Instalações</label><input type="number" min="0" disabled={userRole !== 'admin'} className="w-full border-2 rounded-lg px-3 py-2 disabled:bg-gray-100" value={limites?.instalacao || 0} onChange={e => handleUpdateLimites('instalacao', e.target.value)} /></div><div><label className="block text-sm font-bold text-gray-600 mb-1">Max. Chamados</label><input type="number" min="0" disabled={userRole !== 'admin'} className="w-full border-2 rounded-lg px-3 py-2 disabled:bg-gray-100" value={limites?.chamado || 0} onChange={e => handleUpdateLimites('chamado', e.target.value)} /></div></div></div><div className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-blue-500"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><ClipboardList className="text-blue-500" /> Tipos de Serviço</h2>{userRole === 'admin' && (<form onSubmit={handleAddTipo} className="flex flex-col gap-2 mb-6"><input type="text" placeholder="Nome" className="w-full border-2 rounded-lg px-3 py-2 text-sm" value={novoTipoNome} onChange={e => setNovoTipoNome(e.target.value)} /><div className="flex gap-2"><input type="time" className="w-24 border-2 rounded-lg px-2 py-2 text-sm" value={novoTipoDuracao} onChange={e => setNovoTipoDuracao(e.target.value)} /><select className="flex-1 border-2 rounded-lg px-2 py-2 text-sm bg-white" value={novoTipoCategoria} onChange={e => setNovoTipoCategoria(e.target.value)}><option value="instalacao">Instalação</option><option value="chamado">Manutenção</option></select><button type="submit" className="bg-blue-500 text-white px-4 rounded-lg"><Plus/></button></div></form>)}<div className="space-y-2">{(listaTipos || []).map((t, idx) => (<div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border hover:border-blue-500"><div className="flex flex-col"><span className="font-medium">{t.nome}</span><div className="flex gap-2 text-xs text-gray-400"><span className="flex items-center gap-1"><Timer size={10}/> {t.duracao}h</span><span className="flex items-center gap-1"><Briefcase size={10}/> {t.categoria}</span></div></div>{userRole === 'admin' && <button onClick={() => handleRemoveTipo(t.nome)} className="text-gray-400 hover:text-red-500"><Trash2 size={18}/></button>}</div>))}</div></div></div></div>)}
+        
+        {/* --- MODAL DO DIA SELECIONADO (CORRIGIDO: PASSAR handleToggleConfirm) --- */}
+        {selectedDay && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden border-t-8 border-[#EB6410]">
+                    <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                        <h3 className="font-bold text-xl text-[#000000] flex items-center gap-2">
+                            <CalendarDays className="text-[#EB6410]" /> Atividades: {new Date(selectedDay).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}
+                        </h3>
+                        <button onClick={() => setSelectedDay(null)}><X size={24} className="text-gray-400 hover:text-[#EB6410]"/></button>
+                    </div>
 
-        {isModalOpen && (<div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto border-t-8 border-[#EB6410]"><div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50"><h3 className="font-bold text-xl text-[#000000]">{formData.uid ? 'Editar OS' : 'Nova OS'}</h3><button onClick={() => setIsModalOpen(false)}><X size={24} className="text-gray-400 hover:text-[#EB6410]"/></button></div><form onSubmit={handleSaveOS} className="p-6 space-y-4"><div><label className="block text-sm font-bold mb-1">Data</label><input type="date" required className="w-full border-2 rounded-lg px-4 py-2" value={formData.data} onChange={e => { setFormData({...formData, data: e.target.value}); checkExpediente(formData.hora_fim, e.target.value); }} /></div><div><label className="block text-sm font-bold mb-1">Cliente</label><input required className="w-full border-2 rounded-lg px-4 py-2" value={formData.cliente} onChange={e => setFormData({...formData, cliente: e.target.value})} /></div><div><label className="block text-sm font-bold mb-1">WhatsApp/Telefone</label><input type="tel" placeholder="81999999999" className="w-full border-2 rounded-lg px-4 py-2" value={formData.telefone} onChange={e => setFormData({...formData, telefone: e.target.value})} /></div><div><label className="block text-sm font-bold mb-1">Endereço</label><input required className="w-full border-2 rounded-lg px-4 py-2" value={formData.endereco} onChange={e => setFormData({...formData, endereco: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold mb-1">Tipo</label><select className="w-full border-2 rounded-lg px-4 py-2 bg-white" required value={formData.tipo} onChange={e => { const t = listaTipos.find(tip => tip.nome === e.target.value); const novoFim = addTimes(formData.hora_inicio, t?.duracao); setFormData({...formData, tipo: e.target.value, hora_fim: novoFim}); if(novoFim) checkExpediente(novoFim, formData.data); }}><option value="" disabled>Selecione...</option>{(listaTipos || []).map(t => <option key={t.nome} value={t.nome}>{t.nome}</option>)}</select></div><div><label className="block text-sm font-bold mb-1">Turno</label><select className="w-full border-2 rounded-lg px-4 py-2 bg-white" value={formData.horario} onChange={e => setFormData({...formData, horario: e.target.value})}><option>Manhã</option><option>Tarde</option></select></div></div><div className="bg-orange-50 p-3 rounded-lg border border-orange-100 grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-[#EB6410] mb-1">INÍCIO PREVISTO</label><input type="time" className="w-full bg-white border border-orange-200 rounded px-2 py-1 text-sm font-bold" value={formData.hora_inicio} onChange={e => { const t = listaTipos.find(tip => tip.nome === formData.tipo); const novoFim = addTimes(e.target.value, t?.duracao); setFormData({...formData, hora_inicio: e.target.value, hora_fim: novoFim}); if(novoFim) checkExpediente(novoFim, formData.data); }} /></div><div><label className="block text-xs font-bold text-[#EB6410] mb-1">FIM (AUTO)</label><input type="time" disabled className="w-full bg-gray-100 border border-gray-200 rounded px-2 py-1 text-sm font-bold text-gray-500" value={formData.hora_fim} /></div></div><div><label className="block text-sm font-bold mb-1">Técnico</label><select className="w-full border-2 rounded-lg px-4 py-2 bg-white" value={formData.tecnico} onChange={e => setFormData({...formData, tecnico: e.target.value})}><option value="">A definir</option>{(listaTecnicos || []).map(t => <option key={t} value={t}>{t}</option>)}</select></div><button type="submit" className="w-full bg-[#EB6410] text-white font-bold py-3 rounded-lg mt-2">{formData.uid ? 'Salvar Alterações' : 'Criar OS'}</button></form></div></div>)}
+                    <div className="p-6 bg-gray-50 flex-1 overflow-y-auto">
+                        {getDayOS(selectedDay).length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-2">
+                                <CalendarDays size={48} className="opacity-20"/>
+                                <p>Nenhuma atividade técnica para este dia.</p>
+                                <button onClick={() => { setIsModalOpen(true); setFormData({...formData, data: selectedDay}); setSelectedDay(null); }} className="text-[#EB6410] font-bold hover:underline">
+                                    Criar Nova OS para esta data
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                {/* BLOCO MANHÃ */}
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-2 border-b pb-2 border-yellow-200">
+                                        <div className="bg-yellow-100 p-1.5 rounded-lg text-yellow-600"><Sun size={20}/></div>
+                                        <h4 className="text-lg font-bold text-gray-700">MANHÃ</h4>
+                                        <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
+                                            {getDayOS(selectedDay).filter(os => !os.horario || os.horario === 'Manhã').length} Agendamentos
+                                        </span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {getDayOS(selectedDay)
+                                            .filter(os => !os.horario || os.horario === 'Manhã')
+                                            .map(os => (
+                                            <OSCard key={os.uid} os={os} handleEditOS={handleEditOS} handleDragStart={handleDragStart} handleUpdateDate={handleUpdateDate} handleUpdateField={handleUpdateField} handleUpdateStatus={handleUpdateStatus} handleDelete={handleDelete} verHistorico={verHistorico} listaTecnicos={listaTecnicos} sendWhatsApp={sendWhatsApp} userRole={userRole} handleToggleConfirm={handleToggleConfirm} />
+                                        ))}
+                                    </div>
+                                </div>
 
-        {selectedDay && (<div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden border-t-8 border-[#EB6410]"><div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50"><h3 className="font-bold text-xl text-[#000000] flex items-center gap-2"><CalendarDays className="text-[#EB6410]" /> Atividades: {new Date(selectedDay).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</h3><button onClick={() => setSelectedDay(null)}><X size={24} className="text-gray-400 hover:text-[#EB6410]"/></button></div><div className="p-6 bg-gray-50 flex-1 overflow-y-auto">{getDayOS(selectedDay).length === 0 ? (<div className="h-full flex flex-col items-center justify-center text-gray-400 gap-2"><CalendarDays size={48} className="opacity-20"/><p>Nenhuma atividade para este dia.</p><button onClick={() => { setIsModalOpen(true); setFormData({...formData, data: selectedDay}); setSelectedDay(null); }} className="text-[#EB6410] font-bold hover:underline">Criar Nova OS para esta data</button></div>) : (getDayOS(selectedDay).map(os => <OSCard key={os.uid} os={os} handleEditOS={handleEditOS} handleDragStart={handleDragStart} handleUpdateDate={handleUpdateDate} handleUpdateField={handleUpdateField} handleUpdateStatus={handleUpdateStatus} handleDelete={handleDelete} verHistorico={verHistorico} listaTecnicos={listaTecnicos} sendWhatsApp={sendWhatsApp} userRole={userRole} />))}</div></div></div>)}
+                                {/* BLOCO TARDE */}
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-2 border-b pb-2 border-blue-200">
+                                        <div className="bg-blue-100 p-1.5 rounded-lg text-blue-600"><Moon size={20}/></div>
+                                        <h4 className="text-lg font-bold text-gray-700">TARDE</h4>
+                                        <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                                            {getDayOS(selectedDay).filter(os => os.horario === 'Tarde').length} Agendamentos
+                                        </span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {getDayOS(selectedDay)
+                                            .filter(os => os.horario === 'Tarde')
+                                            .map(os => (
+                                            <OSCard key={os.uid} os={os} handleEditOS={handleEditOS} handleDragStart={handleDragStart} handleUpdateDate={handleUpdateDate} handleUpdateField={handleUpdateField} handleUpdateStatus={handleUpdateStatus} handleDelete={handleDelete} verHistorico={verHistorico} listaTecnicos={listaTecnicos} sendWhatsApp={sendWhatsApp} userRole={userRole} handleToggleConfirm={handleToggleConfirm} />
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
+
         {isHistoryModalOpen && (<div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border-t-8 border-gray-600"><div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50"><h3 className="font-bold text-xl text-[#000000] flex items-center gap-2"><History className="text-gray-600" /> Histórico</h3><button onClick={() => setIsHistoryModalOpen(false)}><X size={24} className="text-gray-400 hover:text-black"/></button></div><div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">{loadingHistory ? <p className="text-center py-4">Carregando...</p> : currentHistory.length === 0 ? <p className="text-center text-gray-400">Vazio.</p> : <div className="relative border-l-2 border-gray-200 ml-3 space-y-6">{currentHistory.map((log, i) => (<div key={i} className="ml-6 relative"><div className="absolute -left-[31px] bg-gray-200 h-4 w-4 rounded-full border-2 border-white"></div><p className="text-xs text-gray-400 font-bold mb-1">{formatDataBr(log.data)}</p><p className="text-sm font-bold text-gray-800">{log.acao}</p><p className="text-sm text-gray-600 mt-1">{log.detalhe}</p><p className="text-xs text-[#EB6410] mt-1 bg-orange-50 w-fit px-2 py-0.5 rounded">{log.usuario}</p></div>))}</div>}</div></div></div>)}
       </div>
     </DndProvider>
