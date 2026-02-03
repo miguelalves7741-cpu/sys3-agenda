@@ -1,8 +1,8 @@
 import React from 'react';
 import { useDrag } from 'react-dnd';
-import { Clock, MapPin, Edit2, Trash2, MessageCircle, Calendar, PhoneCall, Check, Sun, Moon } from 'lucide-react';
+import { Clock, MapPin, Edit2, Trash2, MessageCircle, Calendar, PhoneCall, Check, Sun, Moon, AlertTriangle } from 'lucide-react';
 
-const OSCard = ({ os, handleEditOS, handleDelete, sendWhatsApp, handleToggleConfirm }) => {
+const OSCard = ({ os, handleEditOS, handleDelete, sendWhatsApp, handleToggleConfirm, isExtra }) => {
   
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'OS',
@@ -12,7 +12,6 @@ const OSCard = ({ os, handleEditOS, handleDelete, sendWhatsApp, handleToggleConf
     }),
   }));
 
-  // Cores da borda lateral
   const getBorderColor = (st) => {
       switch(st) {
           case 'Encerrada': return 'border-green-500';
@@ -22,7 +21,6 @@ const OSCard = ({ os, handleEditOS, handleDelete, sendWhatsApp, handleToggleConf
       }
   };
 
-  // Cor do Badge de Status
   const getStatusBadge = (st) => {
       switch(st) {
           case 'Encerrada': return 'bg-green-100 text-green-700';
@@ -37,15 +35,12 @@ const OSCard = ({ os, handleEditOS, handleDelete, sendWhatsApp, handleToggleConf
         ref={drag}
         className={`bg-white rounded-xl p-3 shadow-sm border-l-[6px] mb-3 hover:shadow-md transition-all relative group ${isDragging ? 'opacity-50' : 'opacity-100'} ${getBorderColor(os.status)}`}
     >
-      {/* HEADER: Data, Turno e Confirmação */}
       <div className="flex justify-between items-start mb-2">
           <div className="flex items-center gap-1.5 flex-wrap">
-            {/* Data */}
             <div className="flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-50 px-2 py-1 rounded border border-gray-200">
                 <Calendar size={10}/> {new Date(os.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}
             </div>
             
-            {/* Turno */}
             {os.horario === 'Tarde' ? (
                 <div className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">
                     <Moon size={10}/> TARDE
@@ -56,27 +51,30 @@ const OSCard = ({ os, handleEditOS, handleDelete, sendWhatsApp, handleToggleConf
                 </div>
             )}
 
-            {/* Confirmação (Selo OK) */}
             {os.confirmado && (
                 <div className="flex items-center gap-1 text-[9px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-100 animate-pulse">
                     <Check size={10}/> OK
                 </div>
             )}
+
+            {/* SELO DE ENCAIXE / SOBREAVISO */}
+            {isExtra && (
+                <div className="flex items-center gap-1 text-[9px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded border border-red-100 animate-pulse">
+                    <AlertTriangle size={10}/> EXTRA
+                </div>
+            )}
           </div>
 
-          {/* Status (Badge no canto - Agora mais largo) */}
           <div className={`flex flex-col items-end justify-center ${getStatusBadge(os.status)} px-3 py-1.5 rounded-lg min-w-[80px]`}>
               <span className="text-[9px] font-bold opacity-70 mb-0.5">#{os.id_sgp || '---'}</span>
               <span className="text-[10px] font-bold uppercase leading-none whitespace-nowrap">{os.status}</span>
           </div>
       </div>
 
-      {/* TÍTULO (Cliente) */}
       <h4 className="font-bold text-gray-800 text-sm uppercase truncate mb-1.5 pr-2" title={os.cliente}>
           {os.cliente}
       </h4>
       
-      {/* TAGS (Tipo e Plano) */}
       <div className="flex flex-wrap gap-2 mb-3">
           <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 uppercase tracking-wide">
               {os.tipo}
@@ -88,7 +86,6 @@ const OSCard = ({ os, handleEditOS, handleDelete, sendWhatsApp, handleToggleConf
           )}
       </div>
 
-      {/* ENDEREÇO */}
       <div className="flex items-start gap-1.5 mb-3 text-gray-500">
           <MapPin size={12} className="mt-0.5 shrink-0 text-gray-400"/>
           <div className="text-[10px] leading-tight">
@@ -97,7 +94,6 @@ const OSCard = ({ os, handleEditOS, handleDelete, sendWhatsApp, handleToggleConf
           </div>
       </div>
 
-      {/* BLOCO DE HORÁRIOS */}
       <div className="flex items-center bg-gray-50 rounded-lg border border-gray-100 mb-3 overflow-hidden">
           <div className="flex-1 p-1.5 text-center border-r border-gray-200">
               <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Início</p>
@@ -114,9 +110,7 @@ const OSCard = ({ os, handleEditOS, handleDelete, sendWhatsApp, handleToggleConf
           </div>
       </div>
 
-      {/* RODAPÉ (Técnico e Botões) */}
       <div className="flex justify-between items-center pt-1">
-          {/* Técnico */}
           <div className="flex items-center gap-2 bg-gray-100 rounded-full px-2 py-1 pr-3 max-w-[120px]">
               <div className="w-5 h-5 rounded-full bg-gray-300 flex items-center justify-center text-[9px] font-bold text-gray-600 border border-white shrink-0">
                   {os.tecnico ? os.tecnico.charAt(0) : '?'}
@@ -126,9 +120,7 @@ const OSCard = ({ os, handleEditOS, handleDelete, sendWhatsApp, handleToggleConf
               </span>
           </div>
 
-          {/* Ações (Botões maiores) */}
           <div className="flex items-center gap-1.5">
-              {/* Botão Telefone */}
               <button 
                 onClick={() => handleToggleConfirm && handleToggleConfirm(os.uid, os.confirmado)} 
                 title={os.confirmado ? "Remover confirmação" : "Confirmar via ligação"}

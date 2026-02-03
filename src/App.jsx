@@ -5,7 +5,7 @@ import {
   Calendar as CalIcon, ClipboardList, User, Clock, X, Search, LogOut, CheckCircle, 
   ChevronLeft, ChevronRight, Timer, History, CalendarDays, GripHorizontal, Settings, 
   Plus, Briefcase, Activity, Shield, Lock, Trash2, MessageCircle, AlertTriangle, 
-  Coffee, CalendarOff, Bell, BarChart3, Volume2, VolumeX, PlayCircle, Sun, Moon, Zap, UserCheck, ScrollText
+  Coffee, CalendarOff, Bell, BarChart3, Volume2, VolumeX, PlayCircle, Sun, Moon, Zap, UserCheck, ScrollText, Siren
 } from 'lucide-react';
 import logoSys3 from './assets/imgLOGO.png';
 import { db, auth } from './firebase';
@@ -30,15 +30,18 @@ function App() {
   const [currentTab, setCurrentTab] = useState('hoje');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [osList, setOsList] = useState([]);
+  
+  // FILTROS
   const [filter, setFilter] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState("");
+  
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(null); 
   const [showUpdates, setShowUpdates] = useState(false); 
   const [notification, setNotification] = useState(null);
   const isFirstLoad = useRef(true);
 
-  // Audio e Configs
+  // Configs
   const [audioContext, setAudioContext] = useState(null);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('sys3_sound_enabled') !== 'false');
@@ -62,6 +65,52 @@ function App() {
   const [currentHistory, setCurrentHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [formData, setFormData] = useState({ uid: '', cliente: '', telefone: '', endereco: '', tipo: '', data: new Date().toISOString().split('T')[0], horario: 'Manhã', tecnico: '', hora_inicio: '', hora_fim: '' });
+
+  // --- DETECTOR DE SOBREAVISO (NOVIDADE) ---
+  // Analisa se o dia de hoje está estourado e quem foi o último a mexer
+  const detectarSobreaviso = () => {
+      const hoje = new Date().toISOString().split('T')[0];
+      const osDoDia = osList.filter(os => os.data === hoje && ehAtividadeOperacional(os));
+      
+      const alertas = [];
+
+      // Separa por Categoria
+      const instalacoes = osDoDia.filter(os => getCategoria(os.tipo) === 'instalacao');
+      const chamados = osDoDia.filter(os => getCategoria(os.tipo) === 'chamado' || getCategoria(os.tipo) === 'manutencao');
+
+      const checarEstouro = (lista, limite, nomeTipo) => {
+          // Agrupa por turno para ser mais específico
+          ['Manhã', 'Tarde'].forEach(turno => {
+              const doTurno = lista.filter(os => os.horario === turno);
+              if (doTurno.length > limite) {
+                  // Pega a última OS criada (a que estourou) baseada no timestamp/uid
+                  // Como UID é timestamp ou string, tentamos achar o "intruso"
+                  const ultimoInfrator = doTurno[doTurno.length - 1]; // Pega o último da lista (assumindo ordem)
+                  
+                  alertas.push({
+                      tipo: nomeTipo,
+                      turno: turno,
+                      qtd: doTurno.length,
+                      limite: limite,
+                      culpado: ultimoInfrator?.last_editor || "Desconhecido",
+                      cliente: ultimoInfrator?.cliente || ""
+                  });
+              }
+          });
+      };
+
+      checarEstouro(instalacoes, limites?.instalacao || 2, "Instalações");
+      checarEstouro(chamados, limites?.chamado || 2, "Reparos");
+
+      return alertas;
+  };
+
+  const changeTab = (tabName) => {
+      setCurrentTab(tabName);
+      setFilter('Todos'); 
+      setSearchTerm('');  
+      setSelectedDay(null); 
+  };
 
   const initAudio = () => {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -146,13 +195,12 @@ function App() {
     }
   }, [user, userRole]);
 
-  // --- LOG GLOBAL ---
   const registrarLogGlobal = async (tipo, titulo, detalhe, osId = null) => {
       if (!user) return;
       try {
           await addDoc(collection(db, "global_logs"), {
               timestamp: new Date().toISOString(),
-              tipo, // nova_os, status, edicao, conclusao, sistema
+              tipo, 
               titulo,
               detalhe,
               usuario: user.email.split('@')[0],
@@ -161,7 +209,6 @@ function App() {
       } catch (e) { console.error("Erro ao gravar log global", e); }
   };
 
-  // Helpers
   const getCategoria = (nomeTipo) => {
     if (!listaTipos || listaTipos.length === 0) return 'chamado';
     const tipo = listaTipos.find(t => t.nome === nomeTipo);
@@ -220,17 +267,13 @@ function App() {
   const registrarHistorico = async (osId, acao, detalhe) => { if (!user) return; try { await addDoc(collection(db, "os", osId, "historico"), { data: new Date().toISOString(), usuario: user.email, acao, detalhe }); } catch (e) {} };
   const verHistorico = async (osId) => { setLoadingHistory(true); setIsHistoryModalOpen(true); setCurrentHistory([]); try { const q = query(collection(db, "os", osId, "historico"), orderBy("data", "desc")); const snap = await getDocs(q); setCurrentHistory(snap.docs.map(d => d.data())); } catch (e) { alert("Erro histórico"); } setLoadingHistory(false); };
   
-  // --- ACTIONS COM LOG GLOBAL ---
-  
   const handleEditOS = (os) => { setFormData({ uid: os.uid, cliente: os.cliente || '', telefone: os.telefone || '', endereco: os.endereco || '', tipo: os.tipo || '', data: os.data || new Date().toISOString().split('T')[0], horario: os.horario || 'Manhã', tecnico: os.tecnico || '', hora_inicio: os.hora_inicio || '', hora_fim: os.hora_fim || '' }); setIsModalOpen(true); };
-  
   const handleSaveOS = async (e) => { 
       e.preventDefault(); 
       if (!checkCapacity(formData.tecnico, formData.data, formData.horario, formData.tipo, formData.uid)) return; 
       try { 
           checkExpediente(formData.hora_fim, formData.data); 
           const dados = { cliente: formData.cliente, telefone: formData.telefone, endereco: formData.endereco, tipo: formData.tipo, data: formData.data, horario: formData.horario, tecnico: formData.tecnico, hora_inicio: formData.hora_inicio, hora_fim: formData.hora_fim, last_editor: user.email, sync_pendente: true }; 
-          
           if (formData.uid) { 
               await updateDoc(doc(db, "os", formData.uid), dados); 
               await registrarHistorico(formData.uid, "Edição Completa", `Atualizado por ${user.email}`);
@@ -244,29 +287,23 @@ function App() {
           setFormData({ uid: '', cliente: '', telefone: '', endereco: '', tipo: listaTipos[0]?.nome || '', data: new Date().toISOString().split('T')[0], horario: 'Manhã', tecnico: '', hora_inicio: '', hora_fim: '' }); 
       } catch (e) { console.error(e); alert("Erro ao salvar."); } 
   };
-
   const handleUpdateStatus = async (uid, novoStatus) => { 
       await updateDoc(doc(db, "os", uid), { status: novoStatus, last_editor: user.email, sync_pendente: true }); 
       await registrarHistorico(uid, "Status", novoStatus);
-      
       const tipoLog = novoStatus === 'Encerrada' ? 'conclusao' : 'status';
       const osAtual = osList.find(o => o.uid === uid);
       await registrarLogGlobal(tipoLog, `Status: ${novoStatus}`, `Técnico: ${osAtual?.tecnico || '?'} - Cliente: ${osAtual?.cliente}`, uid);
   };
-
-  // --- NOVA FUNÇÃO: TOGGLE CONFIRMAÇÃO ---
   const handleToggleConfirm = async (uid, currentStatus) => {
       try {
           const novoStatus = !currentStatus;
           await updateDoc(doc(db, "os", uid), { confirmado: novoStatus });
-          
           if (novoStatus) {
               const osAtual = osList.find(o => o.uid === uid);
               await registrarLogGlobal("status", "Agendamento Confirmado", `Contato realizado com ${osAtual?.cliente}`, uid);
           }
       } catch (e) { console.error("Erro ao confirmar:", e); }
   };
-
   const handleUpdateField = async (uid, field, value, currentOS = null) => { 
       if (currentOS) { 
           if (field === 'tecnico' && !checkCapacity(value, currentOS.data, currentOS.horario, currentOS.tipo, uid)) return; 
@@ -274,26 +311,17 @@ function App() {
       } 
       let updateData = { [field]: value, last_editor: user.email, sync_pendente: true }; 
       let acao = "Edição"; 
-      
       if (field === 'hora_inicio' && currentOS) { 
           acao = "Apontamento"; 
           const configTipo = listaTipos.find(t => t.nome === currentOS.tipo); 
-          if (configTipo) { 
-              const novoFim = addTimes(value, configTipo.duracao); 
-              updateData.hora_fim = novoFim; checkExpediente(novoFim, currentOS.data); 
-          } 
+          if (configTipo) { const novoFim = addTimes(value, configTipo.duracao); updateData.hora_fim = novoFim; checkExpediente(novoFim, currentOS.data); } 
       } else if (field === 'hora_fim') { checkExpediente(value, currentOS?.data); } 
-      
       if (field === 'tecnico') acao = "Atribuição"; 
-      
       await updateDoc(doc(db, "os", uid), updateData); 
       await registrarHistorico(uid, acao, `${field} -> ${value}`);
-      
-      // LOG GLOBAL
       if (field === 'tecnico') await registrarLogGlobal("edicao", "Troca de Técnico", `De ${currentOS.tecnico} para ${value}`, uid);
       if (field === 'hora_inicio') await registrarLogGlobal("status", "Início de Execução", `Iniciado às ${value}`, uid);
   };
-
   const handleUpdateDate = async (uid, novaData, dataAntiga) => { 
       if (!novaData || novaData === dataAntiga) return; 
       const os = osList.find(o => o.uid === uid); 
@@ -303,19 +331,9 @@ function App() {
       await registrarHistorico(uid, "Reagendamento", `Para ${novaData}`); 
       await registrarLogGlobal("edicao", "Reagendamento", `De ${formatDataBr(dataAntiga)} para ${formatDataBr(novaData)}`, uid);
   };
-
-  const handleDelete = async (uid) => { 
-      if (userRole !== 'admin') return alert("Permissão negada."); 
-      if(confirm("Excluir?")) {
-          await deleteDoc(doc(db, "os", uid));
-          await registrarLogGlobal("sistema", "OS Excluída", `ID: ${uid}`, uid);
-      }
-  };
-
+  const handleDelete = async (uid) => { if (userRole !== 'admin') return alert("Permissão negada."); if(confirm("Excluir?")) { await deleteDoc(doc(db, "os", uid)); await registrarLogGlobal("sistema", "OS Excluída", `ID: ${uid}`, uid); } };
   const handleDragStart = (e, os) => { setDraggedOS(os); }; 
   const handleDropTech = async (e, targetTech) => { e.preventDefault(); setDragOverTech(null); if (draggedOS) { if (!checkCapacity(targetTech, draggedOS.data, draggedOS.horario, draggedOS.tipo, draggedOS.uid)) return; await handleUpdateField(draggedOS.uid, 'tecnico', targetTech, draggedOS); setDraggedOS(null); } };
-  
-  // Config Actions (Admin)
   const handleUpdateLimites = async (campo, valor) => { if (userRole !== 'admin') return; const novos = { ...limites, [campo]: Number(valor) }; setLimites(novos); await updateDoc(doc(db, "configuracoes", "geral"), { limites: novos }); }; 
   const handleAddTecnico = async (e) => { e.preventDefault(); if (userRole !== 'admin') return; if(!novoTecnico.trim()) return; await updateDoc(doc(db, "configuracoes", "geral"), { tecnicos: [...listaTecnicos, novoTecnico.trim()] }); setNovoTecnico(""); }; 
   const handleRemoveTecnico = async (nome) => { if (userRole !== 'admin') return; if(confirm("Remover?")) await updateDoc(doc(db, "configuracoes", "geral"), { tecnicos: listaTecnicos.filter(t => t !== nome) }); }; 
@@ -324,7 +342,6 @@ function App() {
   const handleToggleRole = async (uid, currentRole) => { if (userRole !== 'admin') return; const newRole = currentRole === 'admin' ? 'interno' : 'admin'; if (confirm(`Alterar cargo para ${newRole}?`)) { await updateDoc(doc(db, "users", uid), { role: newRole }); } }; 
   const handleAddFolga = async (e) => { e.preventDefault(); if (userRole !== 'admin') return; if (!folgaTecnico || !folgaData) return alert("Selecione técnico e data."); const exists = folgas.find(f => f.tecnico === folgaTecnico && f.data === folgaData); if (exists) return alert("Já existe uma regra para este técnico nesta data."); const novaFolga = { tecnico: folgaTecnico, data: folgaData, limite: Number(folgaLimite) }; await updateDoc(doc(db, "configuracoes", "geral"), { folgas: [...folgas, novaFolga] }); setFolgaTecnico(""); setFolgaData(""); setFolgaLimite(0); }; 
   const handleRemoveFolga = async (tecnico, data) => { if (userRole !== 'admin') return; if (confirm("Remover esta folga/regra?")) { await updateDoc(doc(db, "configuracoes", "geral"), { folgas: folgas.filter(f => !(f.tecnico === tecnico && f.data === data)) }); } };
-  
   const getTodayOS = () => { const hoje = new Date().toISOString().split('T')[0]; return applyFilters(osList.filter(os => os.data === hoje)); }; 
   const getDayOS = (dateStr) => { return applyFilters(osList.filter(os => os.data === dateStr)); };
   
@@ -332,6 +349,7 @@ function App() {
   if (!user) return <Login onLogin={handleLogin} error={loginError} />;
 
   const tecnicosOciosos = getTecnicosOciosos();
+  const alertasSobreaviso = detectarSobreaviso();
 
   if (!audioUnlocked) {
     return (
@@ -355,12 +373,12 @@ function App() {
         <header className="mb-6 flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border-t-4 border-[#EB6410]">
           <div className="flex items-center gap-4 mb-4 md:mb-0"><img src={logoSys3} className="h-10 object-contain" /><div className="hidden md:block h-6 w-px bg-gray-200"></div><span className="text-sm font-bold text-gray-600 hidden md:block">Gestão Inteligente</span></div>
           <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto">
-            <button onClick={() => setCurrentTab('hoje')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${currentTab === 'hoje' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Hoje</button>
-            <button onClick={() => setCurrentTab('calendario')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${currentTab === 'calendario' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Calendário</button>
-            <button onClick={() => setCurrentTab('tecnicos')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${currentTab === 'tecnicos' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Performance</button>
-            <button onClick={() => setCurrentTab('feed')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap flex items-center gap-1 ${currentTab === 'feed' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><ScrollText size={14}/> Atividades</button>
-            <button onClick={() => setCurrentTab('dashboard')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 whitespace-nowrap ${currentTab === 'dashboard' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><BarChart3 size={14}/> Comercial</button>
-            <button onClick={() => setCurrentTab('config')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 whitespace-nowrap ${currentTab === 'config' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><Settings size={14}/> Config</button>
+            <button onClick={() => changeTab('hoje')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${currentTab === 'hoje' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Hoje</button>
+            <button onClick={() => changeTab('calendario')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${currentTab === 'calendario' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Calendário</button>
+            <button onClick={() => changeTab('tecnicos')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${currentTab === 'tecnicos' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Performance</button>
+            <button onClick={() => changeTab('feed')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap flex items-center gap-1 ${currentTab === 'feed' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><ScrollText size={14}/> Atividades</button>
+            <button onClick={() => changeTab('dashboard')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 whitespace-nowrap ${currentTab === 'dashboard' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><BarChart3 size={14}/> Comercial</button>
+            <button onClick={() => changeTab('config')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 whitespace-nowrap ${currentTab === 'config' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><Settings size={14}/> Config</button>
           </div>
           <div className="flex gap-2 mt-4 md:mt-0">
              <button onClick={toggleSound} className={`px-3 py-2 rounded-lg transition border ${soundEnabled ? 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100' : 'bg-gray-100 text-gray-400 border-transparent hover:bg-gray-200'}`} title={soundEnabled ? "Som Ligado" : "Som Mudo"}>{soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>
@@ -374,8 +392,31 @@ function App() {
 
         {currentTab === 'hoje' && (
           <div className="flex-1 overflow-x-auto pb-4">
+              
+              {/* --- ALERTA DE SOBREAVISO (QUANDO EXCEDER O LIMITE) --- */}
+              {alertasSobreaviso.length > 0 && (
+                  <div className="mb-4 bg-red-100 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm animate-pulse">
+                      <div className="flex items-start gap-3">
+                          <div className="bg-red-200 p-2 rounded-full text-red-600"><Siren size={24} /></div>
+                          <div className="flex-1">
+                              <h3 className="font-bold text-red-800 text-sm uppercase flex items-center gap-2">⚠️ SOBRECARGA DE AGENDA DETECTADA!</h3>
+                              <div className="mt-1 space-y-1">
+                                  {alertasSobreaviso.map((alerta, idx) => (
+                                      <p key={idx} className="text-xs text-red-700 bg-red-50 p-1 rounded border border-red-200">
+                                          <span className="font-bold">{alerta.tipo} ({alerta.turno}):</span> {alerta.qtd}/{alerta.limite} vagas. 
+                                          <span className="ml-2 block sm:inline mt-1 sm:mt-0">
+                                              👉 Última inserção por: <strong className="uppercase underline">{alerta.culpado.split('@')[0]}</strong> (Cliente: {alerta.cliente.split(' ')[0]})
+                                          </span>
+                                      </p>
+                                  ))}
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              )}
+
               {tecnicosOciosos.length > 0 && (
-                  <div className="mb-4 bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded-r-lg shadow-sm flex items-center justify-between animate-pulse">
+                  <div className="mb-4 bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded-r-lg shadow-sm flex items-center justify-between">
                       <div className="flex items-center gap-3">
                           <UserCheck size={24} className="text-yellow-700"/>
                           <div>
@@ -428,7 +469,6 @@ function App() {
         {currentTab === 'dashboard' && <Dashboard />}
         {currentTab === 'config' && (<div className="grid grid-cols-1 lg:grid-cols-2 gap-8">{userRole !== 'admin' && (<div className="col-span-full bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 rounded-md flex items-center gap-2"><Lock size={20} /><div><p className="font-bold">Modo de Visualização</p><p className="text-xs">Apenas administradores podem alterar configurações.</p></div></div>)}<div className="space-y-6"><div className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-[#EB6410]"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><User className="text-[#EB6410]" /> Equipe Técnica</h2>{userRole === 'admin' && (<form onSubmit={handleAddTecnico} className="flex gap-2 mb-6"><input type="text" placeholder="Nome" className="flex-1 border-2 rounded-lg px-4 py-2" value={novoTecnico} onChange={e => setNovoTecnico(e.target.value)} /><button type="submit" className="bg-[#EB6410] text-white px-4 rounded-lg"><Plus/></button></form>)}<div className="space-y-2">{(listaTecnicos || []).map((tec, idx) => (<div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border hover:border-[#EB6410]"><span className="font-medium">{tec}</span>{userRole === 'admin' && <button onClick={() => handleRemoveTecnico(tec)} className="text-gray-400 hover:text-red-500"><Trash2 size={18}/></button>}</div>))}</div></div><div className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-red-500"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Coffee className="text-red-500" /> Escala de Folgas</h2>{userRole === 'admin' && (<form onSubmit={handleAddFolga} className="bg-red-50 p-4 rounded-lg mb-4 border border-red-100"><div className="grid grid-cols-2 gap-3 mb-3"><select className="border rounded px-2 py-1.5 w-full bg-white" value={folgaTecnico} onChange={e => setFolgaTecnico(e.target.value)}><option value="">Selecione Técnico...</option>{(listaTecnicos || []).map(t => <option key={t} value={t}>{t}</option>)}</select><input type="date" className="border rounded px-2 py-1.5 w-full" value={folgaData} onChange={e => setFolgaData(e.target.value)} /></div><div className="flex gap-2 items-center"><label className="text-xs font-bold text-red-700">Vagas Disponíveis:</label><input type="number" min="0" max="10" className="border rounded w-16 px-2 py-1 text-center font-bold" value={folgaLimite} onChange={e => setFolgaLimite(e.target.value)} /><span className="text-xs text-gray-500">(0 = Folga Total)</span><button type="submit" className="ml-auto bg-red-500 text-white px-3 py-1 rounded text-xs font-bold hover:bg-red-600">Agendar</button></div></form>)}<div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">{(folgas || []).map((f, idx) => (<div key={idx} className="flex justify-between items-center p-2 bg-white rounded border border-red-100 text-sm"><div><span className="font-bold text-gray-700">{f.tecnico}</span><span className="mx-2 text-gray-300">|</span><span>{new Date(f.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</span><span className={`ml-2 text-[10px] font-bold px-2 py-0.5 rounded ${Number(f.limite)===0 ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-700'}`}>{Number(f.limite) === 0 ? 'FOLGA TOTAL' : `${f.limite} VAGAS`}</span></div>{userRole === 'admin' && <button onClick={() => handleRemoveFolga(f.tecnico, f.data)} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>}</div>))}</div></div>{userRole === 'admin' && (<div className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-gray-700"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Shield className="text-gray-700" /> Acesso de Usuários</h2><div className="space-y-2">{(usuariosSistema || []).map((u) => (<div key={u.uid} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border"><div className="flex flex-col"><span className="font-bold text-sm text-gray-800">{u.email}</span><span className={`text-xs font-bold uppercase ${u.role === 'admin' ? 'text-green-600' : 'text-gray-500'}`}>{u.role}</span></div>{u.email !== user.email && (<button onClick={() => handleToggleRole(u.uid, u.role)} className="text-xs bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded font-bold transition">Mudar Cargo</button>)}</div>))}</div></div>)}</div><div className="space-y-6"><div className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-purple-500"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Activity className="text-purple-500" /> Regras Globais</h2><div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-gray-600 mb-1">Max. Instalações</label><input type="number" min="0" disabled={userRole !== 'admin'} className="w-full border-2 rounded-lg px-3 py-2 disabled:bg-gray-100" value={limites?.instalacao || 0} onChange={e => handleUpdateLimites('instalacao', e.target.value)} /></div><div><label className="block text-sm font-bold text-gray-600 mb-1">Max. Chamados</label><input type="number" min="0" disabled={userRole !== 'admin'} className="w-full border-2 rounded-lg px-3 py-2 disabled:bg-gray-100" value={limites?.chamado || 0} onChange={e => handleUpdateLimites('chamado', e.target.value)} /></div></div></div><div className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-blue-500"><h2 className="text-xl font-bold mb-4 flex items-center gap-2"><ClipboardList className="text-blue-500" /> Tipos de Serviço</h2>{userRole === 'admin' && (<form onSubmit={handleAddTipo} className="flex flex-col gap-2 mb-6"><input type="text" placeholder="Nome" className="w-full border-2 rounded-lg px-3 py-2 text-sm" value={novoTipoNome} onChange={e => setNovoTipoNome(e.target.value)} /><div className="flex gap-2"><input type="time" className="w-24 border-2 rounded-lg px-2 py-2 text-sm" value={novoTipoDuracao} onChange={e => setNovoTipoDuracao(e.target.value)} /><select className="flex-1 border-2 rounded-lg px-2 py-2 text-sm bg-white" value={novoTipoCategoria} onChange={e => setNovoTipoCategoria(e.target.value)}><option value="instalacao">Instalação</option><option value="chamado">Manutenção</option></select><button type="submit" className="bg-blue-500 text-white px-4 rounded-lg"><Plus/></button></div></form>)}<div className="space-y-2">{(listaTipos || []).map((t, idx) => (<div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border hover:border-blue-500"><div className="flex flex-col"><span className="font-medium">{t.nome}</span><div className="flex gap-2 text-xs text-gray-400"><span className="flex items-center gap-1"><Timer size={10}/> {t.duracao}h</span><span className="flex items-center gap-1"><Briefcase size={10}/> {t.categoria}</span></div></div>{userRole === 'admin' && <button onClick={() => handleRemoveTipo(t.nome)} className="text-gray-400 hover:text-red-500"><Trash2 size={18}/></button>}</div>))}</div></div></div></div>)}
         
-        {/* --- MODAL DO DIA SELECIONADO (CORRIGIDO: PASSAR handleToggleConfirm) --- */}
         {selectedDay && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                 <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden border-t-8 border-[#EB6410]">
@@ -450,7 +490,6 @@ function App() {
                             </div>
                         ) : (
                             <div className="space-y-6">
-                                {/* BLOCO MANHÃ */}
                                 <div className="space-y-3">
                                     <div className="flex items-center gap-2 border-b pb-2 border-yellow-200">
                                         <div className="bg-yellow-100 p-1.5 rounded-lg text-yellow-600"><Sun size={20}/></div>
@@ -460,15 +499,11 @@ function App() {
                                         </span>
                                     </div>
                                     <div className="space-y-2">
-                                        {getDayOS(selectedDay)
-                                            .filter(os => !os.horario || os.horario === 'Manhã')
-                                            .map(os => (
+                                        {getDayOS(selectedDay).filter(os => !os.horario || os.horario === 'Manhã').map(os => (
                                             <OSCard key={os.uid} os={os} handleEditOS={handleEditOS} handleDragStart={handleDragStart} handleUpdateDate={handleUpdateDate} handleUpdateField={handleUpdateField} handleUpdateStatus={handleUpdateStatus} handleDelete={handleDelete} verHistorico={verHistorico} listaTecnicos={listaTecnicos} sendWhatsApp={sendWhatsApp} userRole={userRole} handleToggleConfirm={handleToggleConfirm} />
                                         ))}
                                     </div>
                                 </div>
-
-                                {/* BLOCO TARDE */}
                                 <div className="space-y-3">
                                     <div className="flex items-center gap-2 border-b pb-2 border-blue-200">
                                         <div className="bg-blue-100 p-1.5 rounded-lg text-blue-600"><Moon size={20}/></div>
@@ -478,9 +513,7 @@ function App() {
                                         </span>
                                     </div>
                                     <div className="space-y-2">
-                                        {getDayOS(selectedDay)
-                                            .filter(os => os.horario === 'Tarde')
-                                            .map(os => (
+                                        {getDayOS(selectedDay).filter(os => os.horario === 'Tarde').map(os => (
                                             <OSCard key={os.uid} os={os} handleEditOS={handleEditOS} handleDragStart={handleDragStart} handleUpdateDate={handleUpdateDate} handleUpdateField={handleUpdateField} handleUpdateStatus={handleUpdateStatus} handleDelete={handleDelete} verHistorico={verHistorico} listaTecnicos={listaTecnicos} sendWhatsApp={sendWhatsApp} userRole={userRole} handleToggleConfirm={handleToggleConfirm} />
                                         ))}
                                     </div>
