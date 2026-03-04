@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import logoSys3 from './assets/imgLOGO.png';
 import { db, auth } from './firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, getDocs, setDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, where, deleteDoc, doc, updateDoc, getDocs, setDoc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
 import Login from './components/Login';
@@ -41,6 +41,9 @@ function App() {
   const [notification, setNotification] = useState(null);
   const isFirstLoad = useRef(true);
 
+  // Estado do Relógio
+  const [currentTime, setCurrentTime] = useState(new Date());
+
   // Configs
   const [audioContext, setAudioContext] = useState(null);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
@@ -66,27 +69,27 @@ function App() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [formData, setFormData] = useState({ uid: '', cliente: '', telefone: '', endereco: '', tipo: '', data: new Date().toISOString().split('T')[0], horario: 'Manhã', tecnico: '', hora_inicio: '', hora_fim: '' });
 
-  // --- DETECTOR DE SOBREAVISO (NOVIDADE) ---
-  // Analisa se o dia de hoje está estourado e quem foi o último a mexer
+  // Efeito do Relógio
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const detectarSobreaviso = () => {
       const hoje = new Date().toISOString().split('T')[0];
       const osDoDia = osList.filter(os => os.data === hoje && ehAtividadeOperacional(os));
       
       const alertas = [];
-
-      // Separa por Categoria
       const instalacoes = osDoDia.filter(os => getCategoria(os.tipo) === 'instalacao');
       const chamados = osDoDia.filter(os => getCategoria(os.tipo) === 'chamado' || getCategoria(os.tipo) === 'manutencao');
 
       const checarEstouro = (lista, limite, nomeTipo) => {
-          // Agrupa por turno para ser mais específico
           ['Manhã', 'Tarde'].forEach(turno => {
               const doTurno = lista.filter(os => os.horario === turno);
               if (doTurno.length > limite) {
-                  // Pega a última OS criada (a que estourou) baseada no timestamp/uid
-                  // Como UID é timestamp ou string, tentamos achar o "intruso"
-                  const ultimoInfrator = doTurno[doTurno.length - 1]; // Pega o último da lista (assumindo ordem)
-                  
+                  const ultimoInfrator = doTurno[doTurno.length - 1]; 
                   alertas.push({
                       tipo: nomeTipo,
                       turno: turno,
@@ -157,7 +160,17 @@ function App() {
 
   useEffect(() => {
     if (user) {
-      const q = query(collection(db, "os"), orderBy("data", "asc"));
+      // Calcula a data de 30 dias atrás
+      const dataAtual = new Date();
+      dataAtual.setDate(dataAtual.getDate() - 30);
+      const dataCorte = dataAtual.toISOString().split('T')[0];
+
+      // Busca apenas do corte para frente
+      const q = query(
+        collection(db, "os"), 
+        where("data", ">=", dataCorte), 
+        orderBy("data", "asc")
+      );
       const unsubOS = onSnapshot(q, (snapshot) => {
         setOsList(snapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id })));
         if (!isFirstLoad.current) {
@@ -381,6 +394,9 @@ function App() {
             <button onClick={() => changeTab('config')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 whitespace-nowrap ${currentTab === 'config' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><Settings size={14}/> Config</button>
           </div>
           <div className="flex gap-2 mt-4 md:mt-0">
+             
+             {/* RELÓGIO REMOVIDO DAQUI */}
+
              <button onClick={toggleSound} className={`px-3 py-2 rounded-lg transition border ${soundEnabled ? 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100' : 'bg-gray-100 text-gray-400 border-transparent hover:bg-gray-200'}`} title={soundEnabled ? "Som Ligado" : "Som Mudo"}>{soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>
             <button onClick={() => setShowUpdates(true)} className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-200 relative"><Bell size={18} /> <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full"></span></button>
             <button onClick={() => { setFormData({ uid: '', cliente: '', telefone: '', endereco: '', tipo: listaTipos[0]?.nome || '', data: new Date().toISOString().split('T')[0], horario: 'Manhã', tecnico: '', hora_inicio: '', hora_fim: '' }); setIsModalOpen(true); }} className="bg-[#EB6410] text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold hover:opacity-90"><ClipboardList size={18} /> Nova OS</button>
@@ -388,12 +404,26 @@ function App() {
           </div>
         </header>
 
-        <div className="mb-4 px-1 flex justify-between items-end"><p className="text-gray-500 text-sm">Olá, <span className="font-bold text-gray-800">{user.email.split('@')[0]}</span> <span className="ml-2 text-xs uppercase bg-gray-200 px-2 py-0.5 rounded text-gray-600 font-bold tracking-wider">{userRole}</span></p></div>
+        {/* LINHA DO USUÁRIO + RELÓGIO (MOVIDO PARA CÁ) */}
+        <div className="mb-4 px-1 flex justify-between items-center">
+            <p className="text-gray-500 text-sm">
+                Olá, <span className="font-bold text-gray-800">{user.email.split('@')[0]}</span> 
+                <span className="ml-2 text-xs uppercase bg-gray-200 px-2 py-0.5 rounded text-gray-600 font-bold tracking-wider">{userRole}</span>
+            </p>
+            
+            {/* RELÓGIO REPOSICIONADO AQUI */}
+            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
+                <Clock size={15} className="text-[#EB6410] animate-pulse" />
+                <span className="text-sm font-mono font-bold text-gray-700">
+                    {currentTime.toLocaleTimeString('pt-BR')}
+                </span>
+            </div>
+        </div>
 
         {currentTab === 'hoje' && (
           <div className="flex-1 overflow-x-auto pb-4">
               
-              {/* --- ALERTA DE SOBREAVISO (QUANDO EXCEDER O LIMITE) --- */}
+              {/* --- ALERTA DE SOBREAVISO --- */}
               {alertasSobreaviso.length > 0 && (
                   <div className="mb-4 bg-red-100 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm animate-pulse">
                       <div className="flex items-start gap-3">
