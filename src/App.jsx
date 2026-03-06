@@ -5,7 +5,7 @@ import {
   Calendar as CalIcon, ClipboardList, User, Clock, X, Search, LogOut, CheckCircle, 
   ChevronLeft, ChevronRight, Timer, History, CalendarDays, GripHorizontal, Settings, 
   Plus, Briefcase, Activity, Shield, Lock, Trash2, MessageCircle, AlertTriangle, 
-  Coffee, CalendarOff, Bell, BarChart3, Volume2, VolumeX, PlayCircle, Sun, Moon, Zap, UserCheck, ScrollText, Siren
+  Coffee, CalendarOff, Bell, BarChart3, Volume2, VolumeX, PlayCircle, Sun, Moon, Zap, UserCheck, ScrollText, Siren, Map, MapPin 
 } from 'lucide-react';
 import logoSys3 from './assets/imgLOGO.png';
 import { db, auth } from './firebase';
@@ -386,6 +386,9 @@ function App() {
         <header className="mb-6 flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border-t-4 border-[#EB6410]">
           <div className="flex items-center gap-4 mb-4 md:mb-0"><img src={logoSys3} className="h-10 object-contain" /><div className="hidden md:block h-6 w-px bg-gray-200"></div><span className="text-sm font-bold text-gray-600 hidden md:block">Gestão Inteligente</span></div>
           <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto">
+		    <button onClick={() => changeTab('rotas')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 whitespace-nowrap ${currentTab === 'rotas' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              <Map size={14}/> Rotas
+            </button>
             <button onClick={() => changeTab('hoje')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${currentTab === 'hoje' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Hoje</button>
             <button onClick={() => changeTab('calendario')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${currentTab === 'calendario' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Calendário</button>
             <button onClick={() => changeTab('tecnicos')} className={`px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${currentTab === 'tecnicos' ? 'bg-white text-[#EB6410] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Performance</button>
@@ -493,7 +496,22 @@ function App() {
           </div>
         )}
 
+
         {currentTab === 'calendario' && <CalendarioVagas onDayClick={setSelectedDay} />}
+		 {currentTab === 'rotas' && (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-white rounded-xl shadow-sm border-2 border-dashed border-gray-300 m-2 mt-4 min-h-[60vh]">
+            <div className="bg-orange-100 p-4 rounded-full mb-4 animate-bounce">
+              <MapPin className="w-12 h-12 text-[#EB6410]" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Planejamento de Rotas Inteligente</h2>
+            <p className="text-gray-500 max-w-md text-center mb-6">
+              Em breve: Integração com o mapa para calcular rotas otimizadas, economizando tempo e combustível da equipe técnica no campo.
+            </p>
+            <span className="bg-[#EB6410] text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md">
+              Módulo SaaS
+            </span>
+          </div>
+        )}
         {currentTab === 'tecnicos' && <PerformanceTecnica osList={osList} listaTecnicos={listaTecnicos} />}
         {currentTab === 'feed' && <ActivityFeed />} 
         {currentTab === 'dashboard' && <Dashboard />}
