@@ -21,6 +21,8 @@ import { UpdatesDrawer } from './components/SystemUpdates';
 import { calcDuration, timeToMinutes, formatDataBr, addTimes } from './utils';
 import CalendarioVagas from './components/CalendarioVagas';
 import ActivityFeed from './components/ActivityFeed'; 
+import { useJsApiLoader, GoogleMap, Marker, DirectionsRenderer } from '@react-google-maps/api';
+
 
 function App() {
   const [user, setUser] = useState(null);
@@ -30,7 +32,73 @@ function App() {
   const [currentTab, setCurrentTab] = useState('hoje');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [osList, setOsList] = useState([]);
+  const [tecnicoRota, setTecnicoRota] = useState("");
+  const [directionsResponse, setDirectionsResponse] = useState(null);
+  const [calculandoRota, setCalculandoRota] = useState(false);
+
+  // --- CONFIGURAÇÕES DO GOOGLE MAPS ---
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY // Puxa a chave oculta do .env
+  });
+
+  const mapContainerStyle = { width: '100%', height: '100%', borderRadius: '0.75rem' };
   
+  // Coordenadas aproximadas da base da Sys3 (João Pessoa) - Você pode ajustar depois com a exata!
+  const sys3BaseCoords = { lat: -7.156532622420834, lng:  -34.87538136802552 };
+
+ // Função que calcula a Rota Inteligente (Versão Blindada)
+  const calcularRota = (osDaRota) => {
+    if (!osDaRota || osDaRota.length === 0 || !window.google) return;
+    setCalculandoRota(true);
+
+    try {
+      const directionsService = new window.google.maps.DirectionsService();
+
+      // 🧹 FILTRO DE LIMPEZA
+      const montarEnderecoParaGoogle = (os) => {
+        let end = os.endereco || "";
+        end = end.replace(/,\s*SN/gi, "").replace(/\bSN\b/gi, "").trim();
+        const bairro = os.bairro ? `, ${os.bairro}` : "";
+        return `${end}${bairro}, João Pessoa, PB`;
+      };
+      
+      const destinoOS = osDaRota[osDaRota.length - 1];
+      const destinoFinal = montarEnderecoParaGoogle(destinoOS);
+
+      const paradas = osDaRota.slice(0, -1).map(os => ({
+        location: montarEnderecoParaGoogle(os),
+        stopover: true
+      }));
+
+      // Conversa com o Google usando o método blindado (Callback)
+      directionsService.route(
+        {
+          origin: sys3BaseCoords,
+          destination: destinoFinal,
+          waypoints: paradas,
+          optimizeWaypoints: true,
+          travelMode: window.google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          if (status === window.google.maps.DirectionsStatus.OK) {
+            // Sucesso! O Google achou tudo. Manda desenhar a linha azul!
+            setDirectionsResponse(result);
+          } else {
+            // Se der erro (ex: rua não existe), ele avisa em vez de dar tela branca!
+            alert(`O Google não encontrou um dos endereços. Motivo: ${status}`);
+            console.warn("Retorno falho do Google:", result);
+          }
+          setCalculandoRota(false);
+        }
+      );
+
+    } catch (error) {
+      console.error("Erro interno ao montar a rota:", error);
+      setCalculandoRota(false);
+    }
+  };
+
   // FILTROS
   const [filter, setFilter] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState("");
@@ -496,22 +564,128 @@ function App() {
           </div>
         )}
 
+{currentTab === 'rotas' && (() => {
+          // 1. Motorzinho que filtra as OSs de hoje para o técnico selecionado
+          // 1. Motorzinho que filtra as OSs de hoje para o técnico selecionado
+          const hojeStr = new Date().toISOString().split('T')[0];
+          const osDaRota = tecnicoRota
+            ? osList
+                .filter(os => {
+                  // Pega o status em minúsculo para evitar erro de digitação no SGP
+                  const status = (os.status || "").toLowerCase();
+                  
+                  return (
+                    os.tecnico === tecnicoRota && 
+                    os.data === hojeStr &&
+                    // A MÁGICA AQUI: Só aceita se NÃO for encerrada, concluída ou cancelada
+                    status !== 'encerrada' &&
+                    status !== 'concluida' &&
+                    status !== 'concluído' &&
+                    status !== 'cancelada'
+                  );
+                })
+                .sort((a, b) => (a.horario || '').localeCompare(b.horario || ''))
+            : [];
 
-        {currentTab === 'calendario' && <CalendarioVagas onDayClick={setSelectedDay} />}
-		 {currentTab === 'rotas' && (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-white rounded-xl shadow-sm border-2 border-dashed border-gray-300 m-2 mt-4 min-h-[60vh]">
-            <div className="bg-orange-100 p-4 rounded-full mb-4 animate-bounce">
-              <MapPin className="w-12 h-12 text-[#EB6410]" />
+          return (
+            <div className="flex-1 flex flex-col lg:flex-row gap-6 p-2 md:p-6 bg-[#f3f4f6]">
+              {/* COLUNA ESQUERDA: LISTA DE ENDEREÇOS */}
+              <div className="w-full lg:w-1/3 bg-white rounded-xl shadow-sm border-t-4 border-[#EB6410] flex flex-col h-[75vh]">
+                <div className="p-4 border-b">
+                  <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <MapPin className="text-[#EB6410]" /> Roteirização
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-1">Selecione a equipe para traçar a rota de hoje.</p>
+                  
+                  <select 
+                    className="mt-4 w-full border-2 rounded-lg px-3 py-2 text-sm font-bold text-gray-700 bg-gray-50 focus:border-[#EB6410] outline-none"
+                    value={tecnicoRota}
+                    onChange={(e) => setTecnicoRota(e.target.value)}
+                  >
+                    <option value="">Selecione o Técnico...</option>
+                    {(listaTecnicos || []).map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar bg-gray-50">
+                  <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg shadow-sm">
+                    <p className="text-[10px] font-bold text-orange-800 uppercase tracking-wider mb-1">📍 Ponto de Partida</p>
+                    <p className="text-sm text-gray-800 font-bold">Sede Sys3 Telecom</p>
+                  </div>
+
+                  <div className="flex justify-center"><div className="w-1 h-4 bg-gray-300 rounded"></div></div>
+
+                  {!tecnicoRota ? (
+                    <div className="bg-white border p-3 rounded-lg shadow-sm border-l-4 border-l-gray-300">
+                      <p className="text-sm text-gray-800 font-bold">Aguardando seleção...</p>
+                      <p className="text-xs text-gray-600 mt-1">Escolha um técnico acima para carregar os endereços.</p>
+                    </div>
+                  ) : osDaRota.length === 0 ? (
+                    <div className="bg-white border p-3 rounded-lg shadow-sm border-l-4 border-l-yellow-400">
+                      <p className="text-sm text-gray-800 font-bold">Agenda Livre</p>
+                      <p className="text-xs text-gray-600 mt-1">Nenhuma atividade operacional agendada para hoje.</p>
+                    </div>
+                  ) : (
+                    osDaRota.map((os, idx) => (
+                      <React.Fragment key={os.uid}>
+                        <div className="bg-white border p-3 rounded-lg shadow-sm border-l-4 border-l-[#EB6410] animate-fade-in">
+                          <div className="flex justify-between items-start mb-1">
+                            <p className="text-xs font-bold text-gray-500">{idx + 1}ª Parada ({os.horario || 'Manhã'})</p>
+                            <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${getCategoria(os.tipo) === 'instalacao' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
+                              {os.tipo}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-800 font-bold line-clamp-1">{os.cliente}</p>
+                          <p className="text-xs text-gray-600 mt-1 line-clamp-2">{os.endereco || "Endereço não informado no SGP"}</p>
+                        </div>
+                        
+                        {idx < osDaRota.length - 1 && (
+                          <div className="flex justify-center"><div className="w-1 h-4 bg-gray-300 rounded"></div></div>
+                        )}
+                      </React.Fragment>
+                    ))
+                  )}
+                </div>
+                
+                <div className="p-4 border-t bg-white">
+                  <button 
+                    onClick={() => calcularRota(osDaRota)}
+                    disabled={!tecnicoRota || osDaRota.length === 0 || calculandoRota} 
+                    className="w-full bg-[#EB6410] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg hover:bg-orange-600 transition flex justify-center items-center gap-2 shadow-md"
+                  >
+                    <Map size={18} /> 
+                    {calculandoRota ? "Calculando melhor caminho..." : (tecnicoRota ? `Otimizar Rota de ${tecnicoRota.split(' ')[0]}` : "Otimizar Rota")}
+                  </button>
+                </div>
+              </div>
+
+              {/* COLUNA DIREITA: O MAPA */}
+              <div className="w-full lg:w-2/3 bg-gray-200 rounded-xl shadow-inner border-2 border-gray-300 flex flex-col items-center justify-center h-[75vh] relative overflow-hidden z-0">
+                 {!isLoaded ? (
+                   <p className="font-bold text-gray-500 animate-pulse">Carregando satélites do Google...</p>
+                 ) : (
+                 <GoogleMap
+                     mapContainerStyle={mapContainerStyle}
+                     center={sys3BaseCoords}
+                     zoom={13}
+                     options={{ mapTypeControl: false, streetViewControl: false }}
+                   >
+                     {/* Pino fixo da sede da Empresa */}
+                     <Marker 
+                       position={sys3BaseCoords} 
+                       label={{ text: "SYS3", color: "white", fontWeight: "bold" }}
+                     />
+
+                     {/* Desenhista da Rota Azul (Só aparece depois de clicar no botão) */}
+                     {directionsResponse && (
+                       <DirectionsRenderer directions={directionsResponse} />
+                     )}
+                   </GoogleMap>
+                 )}
+              </div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Planejamento de Rotas Inteligente</h2>
-            <p className="text-gray-500 max-w-md text-center mb-6">
-              Em breve: Integração com o mapa para calcular rotas otimizadas, economizando tempo e combustível da equipe técnica no campo.
-            </p>
-            <span className="bg-[#EB6410] text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md">
-              Módulo SaaS
-            </span>
-          </div>
-        )}
+          );
+        })()}
         {currentTab === 'tecnicos' && <PerformanceTecnica osList={osList} listaTecnicos={listaTecnicos} />}
         {currentTab === 'feed' && <ActivityFeed />} 
         {currentTab === 'dashboard' && <Dashboard />}
